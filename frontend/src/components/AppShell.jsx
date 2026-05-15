@@ -64,7 +64,7 @@ export default function AppShell({ role, title }) {
 
   return (
     <div className="min-h-screen pb-28 md:pb-0" data-testid={`shell-${role}`}>
-      <Sidebar items={items} testId={`${role}-sidebar`} />
+      <Sidebar items={items} testId={`sidebar`} />
       <TopBar items={items} title={title} />
 
       <main className="md:pl-72">
@@ -73,7 +73,7 @@ export default function AppShell({ role, title }) {
         </div>
       </main>
 
-      <BottomNav items={items} testId={`${role}-bottom-nav`} />
+      <BottomNav items={items} testId={`bottom-nav`} />
     </div>
   );
 }

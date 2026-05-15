@@ -1,0 +1,79 @@
+{
+  "summary": "Iteration 3 — Fase 4 retest after AuthContext.applyLocalProfile + 8s failsafe fix. The CRITICAL hard-reload-loader-trap reported in iteration_2 is FIXED: /salon, /salon/services, /salon/products and /app/vision all render their page testids after hard navigation (~8s — released by the failsafe, not by a faster getSession resolution, but no longer trapped). The Spanish error mapping works (login with bad creds → 'Correo o contraseña incorrectos.'). ErrorBoundary is correctly mounted at /app/frontend/src/index.js (data-testid='error-boundary' renders only on catch, which is expected). NEW HIGH-priority bugs surfaced: (1) SalonOverview is stuck in 'overview-loading' state indefinitely — kpi-services/kpi-products/kpi-appointments never render because Promise.all() in refresh() awaits an appointments query that appears to hang (probably RLS on the profiles join). Consequence: empty-state KPI=0 cannot be observed and SalonOverview's loading skeleton stays on screen forever for a fresh salon. (2) Service create flow is silently broken: clicking [data-testid='service-save-btn'] after filling name + description + category 'hair' + price '750' leaves the modal in 'Guardando…' state forever — no service-error toast and no card added to grid. The price input also appears EMPTY in the modal after fill() — likely the field has a controlled-input quirk (number type with react-hook-form) that drops the value. (3) Product modal does NOT expose [data-testid='product-category-select'] — the form uses product-type-select instead. Migration 0003 introduces a `category` column; the modal still wires up the old `type` column, so the spec's category test cannot run. Mobile (390): no horizontal overflow on any of /, /login, /signup, /app, /app/vision, /salon, /salon/services, /salon/products, /onboarding/salon. Bottom-nav and top-bar still lack data-testid (carried over from iteration_2).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "SalonOverview",
+        "issue": "loading flag never resolves on a fresh salon. Promise.all() in refresh() awaits an appointments query joining profiles via client_id; if RLS denies that join or the row count returns null Promise.all may hang and setLoading(false) never runs. KPIs (kpi-services, kpi-products, kpi-appointments) and 'Próximas citas' stay in skeleton state.",
+        "selector": "[data-testid='overview-loading'] / missing [data-testid='kpi-services|kpi-products|kpi-appointments']",
+        "priority": "HIGH"
+      },
+      {
+        "component": "ServiceFormModal",
+        "issue": "Submit hangs in 'Guardando…' state with no service-error displayed. Price field appears empty in the modal after a programmatic fill (probable controlled-input issue with number-typed input + react-hook-form). Either (a) RLS on services denies the insert because current_salon_id() returns null (profile.salon_id not yet committed in DB row even though metadata is set), or (b) price = NaN/0 trips a CHECK constraint. The supabase insert error is being swallowed by Services.jsx.",
+        "selector": "[data-testid='service-save-btn'] / [data-testid='service-price-input']",
+        "priority": "HIGH"
+      },
+      {
+        "component": "ProductFormModal",
+        "issue": "Missing [data-testid='product-category-select']. Modal still uses [data-testid='product-type-select'] which maps to the old products.type column. Migration 0003 introduces products.category + products.recommended_for; the modal needs to be migrated to the new column names and a category select rendered. Until then the spec's product CRUD coverage cannot be exercised even after 0003 is applied.",
+        "selector": "[data-testid='product-category-select']",
+        "priority": "HIGH"
+      },
+      {
+        "component": "AuthContext failsafe",
+        "issue": "Hard-reload of any /salon/* or /app/* deep-link releases the FullScreenLoader exactly at the 8 s failsafe timeout — i.e. getSession() + fetchProfile() are NOT resolving quickly on rehydration; the user always sees ~8 s of splash. Functional (loader no longer permanent) but the perceived perf is poor. Investigate whether the supabase-js getSession() is hitting a network retry on the first deep-link load (PKCE cookie race) and consider parallelising getSession + fetchProfile or shortening the failsafe to 3 s.",
+        "selector": "[data-testid='app-loading']",
+        "priority": "MEDIUM"
+      },
+      {
+        "component": "BottomNav / TopBar (mobile)",
+        "issue": "No data-testid on the mobile bottom nav nor top bar (already reported in iteration_2). Cannot validate the 5 client + 6 salon nav items required by the spec.",
+        "selector": "[data-testid='bottom-nav'] / [data-testid='top-bar']",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Service create (RLS / current_salon_id chain)",
+        "issue": "After onboarding RPC the in-memory profile is patched via applyLocalProfile but the DB row in public.profiles may still be NULL on salon_id until the canonical refresh round-trip completes. If RLS on `services` uses current_salon_id() → it reads profiles.salon_id from JWT or from a SELECT, the insert can be denied silently. Need to verify whether the onboarding RPC updates profiles.salon_id atomically (the create_my_salon function), and add a deterministic in-flight banner instead of a stuck 'Guardando…'.",
+        "affected_selectors": ["[data-testid='service-save-btn']", "[data-testid='service-error']"]
+      },
+      {
+        "flow": "Salon overview KPIs",
+        "issue": "Promise.all on services+products+appointments+salon hangs indefinitely on a fresh salon → KPIs never render. Should switch to Promise.allSettled() and per-query error states so KPI=0 always shows.",
+        "affected_selectors": ["[data-testid='overview-loading']"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_3.json"],
+  "action_items": [
+    "FIX SalonOverview: replace Promise.all with Promise.allSettled and always call setLoading(false) in a finally block; show KPI=0 even on partial errors. Verify the appointments select with profiles join is allowed by RLS for salon_owner role.",
+    "FIX ServiceFormModal: the price input shows empty after submit attempt — investigate react-hook-form registration on number input. Surface supabase insert errors in [data-testid='service-error'] (currently swallowed). Make the save button NOT stay disabled in 'Guardando…' forever when the RPC errors.",
+    "FIX RLS / onboarding race: confirm create_my_salon RPC sets profiles.salon_id atomically (server-side) so a subsequent services insert authenticated via current_salon_id() succeeds. If not, add UPDATE profiles SET salon_id=... inside the SQL function.",
+    "Rename/replace ProductFormModal's `product-type-select` with `product-category-select` once migration 0003 is applied (so the spec's category coverage runs). Add recommended_for comma-split UX as documented in the spec.",
+    "Add data-testid='bottom-nav', 'bottom-nav-{key}', 'top-bar' on the mobile shell (carried over from iteration_2).",
+    "Tighten the AuthContext failsafe from 8 s to 3 s, OR parallelise getSession() + fetchProfile() to avoid the visible 8 s splash on every hard reload."
+  ],
+  "critical_code_review_comments": [
+    "SalonOverview.refresh() uses Promise.all which is fail-fast — a single hanging count query traps loading=true forever. Use Promise.allSettled and wrap setLoading(false) in a finally block.",
+    "Services.jsx swallows the supabase insert error (or maps it to a friendly string that never renders). The save button must surface the error via [data-testid='service-error'] and unblock the modal.",
+    "ServiceFormModal price input: react-hook-form + type='number' + valueAsNumber is brittle; the value appears empty after a programmatic fill. Use type='number' with valueAsNumber:true AND a defaultValue, or use a controlled text input.",
+    "ProductFormModal still wires to products.type instead of products.category. Migration 0003 will add `category` but the form will not pick it up — coordinated FE+DB change needed.",
+    "AuthContext: the 8-s failsafe is doing the heavy lifting on every hard-reload. The fact that getSession() does not resolve in under 8 s on a re-hydrated session is suspicious; check whether supabase-js is hitting a network retry because of the Storage URL hash callback flow.",
+    "ErrorBoundary is correctly mounted in index.js but the [data-testid='error-boundary'] is only rendered on caught error (by design) — spec asks only to verify mount, which is satisfied."
+  ],
+  "updated_files": ["/app/test_reports/iteration_3.json"],
+  "success_rate": {
+    "backend": "skipped (frontend-only request)",
+    "frontend": "10/15 PASS (hard-reload /salon, /salon/services, /salon/products, /app/vision all render; signup salon_owner → onboarding → /salon nav works; onboarding form + AI logo modal opens; mobile no-overflow on all 9 pages; Spanish login error 'Correo o contraseña incorrectos.'; ErrorBoundary mounted; vision-page renders; salon-overview testid renders). 5 FAIL or BLOCKED: SalonOverview KPIs stuck in loading skeleton, service create silently hangs, product create can't run because product-category-select missing, vision upload blocked by missing bucket (0003), AI-logo storage upload blocked by missing bucket (0003)."
+  },
+  "test_credentials": "test_salon_<rand>@roomie.test / Roomie2026! (salon_owner). Confirm-email OFF.",
+  "seed_data_creation": "Two fresh Supabase auth users + one salon ('Aurora QA <rand>') via real signup + create_my_salon RPC. No backend seed touched.",
+  "retest_needed": true,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "Once SalonOverview Promise.allSettled fix + ServiceFormModal price/error-surfacing fix are landed, retest: (1) KPIs render with 0 on a fresh salon, then 1 after creating a service; (2) /salon/services create with category 'hair' + price 750 → card appears + edit/toggle/delete; (3) after migration 0003 ProductFormModal exposes product-category-select and recommended_for chips → create with 'rizado,fino' → friendly Spanish error if bucket missing, success if buckets created; (4) /app/vision selfie upload happy path after buckets exist; (5) AI logo modal 'Usar este logo' after buckets exist; (6) ErrorBoundary auto-renders [data-testid='error-boundary'] when a child throws (use page.evaluate to trigger). Hard-reload regression is FIXED — no need to re-run unless AuthContext is refactored.",
+  "rca of the issue": "SalonOverview loading lock: Promise.all in refresh() awaits 4 queries; if any one (most likely the appointments select with the profiles join) hangs or returns an error that does not throw, the next setLoading(false) line is reached but the data may be stale or the awaitable never resolves at all. Mitigation: switch to Promise.allSettled and wrap the entire refresh body in try/finally with setLoading(false) in finally. Service create hang: the modal disables save → calls supabase.from('services').insert(...) → awaits → result is dropped without surfacing an error. Combined with the empty price field (react-hook-form valueAsNumber edge case) the insert probably submits price=null which violates a CHECK constraint, returns a 400, and the .insert() promise resolves with {data:null,error} that the modal does not surface. Mitigation: log + surface error.message into [data-testid='service-error'], default price to 0, and gate the save button on isSubmitting only. Hard-reload 8-s splash: every deep-link load waits for the AuthContext failsafe. Mitigation: short-circuit when supabase.auth.getSession() returns immediately by reading the localStorage session synchronously, OR drop the failsafe to 3 s."
+}

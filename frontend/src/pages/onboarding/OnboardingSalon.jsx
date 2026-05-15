@@ -44,7 +44,7 @@ function slugify(value) {
 }
 
 export default function OnboardingSalon() {
-  const { profile, refreshProfile } = useAuth();
+  const { profile, applyLocalProfile, refreshProfile } = useAuth();
   const navigate = useNavigate();
 
   const {
@@ -103,7 +103,7 @@ export default function OnboardingSalon() {
       sales_style: values.sales_style,
     };
 
-    const { error } = await supabase.rpc("create_my_salon", {
+    const { data: newSalon, error } = await supabase.rpc("create_my_salon", {
       p_name: values.name.trim(),
       p_slug: slugify(values.slug || values.name),
       p_primary_color: values.primary_color,
@@ -136,7 +136,22 @@ export default function OnboardingSalon() {
       return;
     }
 
-    await refreshProfile();
+    // Mirror salon_id into auth.users.user_metadata so any later hard-reload
+    // that races the `profiles` SELECT still resolves to the right tenant via
+    // the metadata-based fallback in AuthContext. Fire-and-forget so it never
+    // blocks the redirect.
+    if (newSalon?.id) {
+      supabase.auth
+        .updateUser({ data: { salon_id: newSalon.id } })
+        .catch(() => {
+          /* best effort — AuthContext self-heals on next profile fetch */
+        });
+      // Apply locally so the next route render already has the right tenant.
+      applyLocalProfile({ salon_id: newSalon.id, role: "salon_owner" });
+    }
+
+    // Best-effort canonical refresh (won't block navigation if Supabase lags).
+    refreshProfile?.();
     navigate("/salon", { replace: true });
   };
 

@@ -10,6 +10,8 @@ export default function BottomNav({ items, testId = "bottom-nav" }) {
     <nav
       className="fixed bottom-0 inset-x-0 z-40 md:hidden px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-2"
       data-testid={testId}
+      role="navigation"
+      aria-label="Navegación principal"
     >
       <div className="rm-glass-strong rounded-3xl px-3 py-2.5 flex items-center justify-around max-w-md mx-auto">
         {items.map((item) => {

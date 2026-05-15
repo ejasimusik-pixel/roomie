@@ -30,7 +30,7 @@ export default function TopBar({ items, title }) {
     <>
       <header
         className="md:hidden sticky top-0 z-30 px-4 pt-[max(env(safe-area-inset-top),0.75rem)] pb-3"
-        data-testid="topbar"
+        data-testid="top-bar"
       >
         <div className="rm-glass-strong rounded-3xl px-4 py-3 flex items-center justify-between">
           <Logo variant="mark" size="sm" />

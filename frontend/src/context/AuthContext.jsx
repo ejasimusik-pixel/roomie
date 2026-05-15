@@ -30,8 +30,11 @@ function buildProfileFromUser(user) {
 
 /**
  * Reads the canonical profile from `public.profiles`. Falls back to a
- * metadata-derived stub if the row doesn't exist yet (RLS-safe: SELECT id =
- * auth.uid()).
+ * metadata-derived stub if the row doesn't exist yet or the query fails.
+ * Note: we intentionally do NOT race the query against a timeout here —
+ * the metadata-based fallback misses post-onboarding salon_id and we'd rather
+ * wait an extra second than mis-route a returning salon_owner. The outer
+ * AuthContext failsafe still guarantees the UI never hangs.
  */
 async function fetchProfile(user) {
   if (!user) return null;
@@ -45,9 +48,25 @@ async function fetchProfile(user) {
       .eq("id", user.id)
       .maybeSingle();
     if (error) {
-      // Most likely cause: migration not yet applied. Fall back gracefully.
-      console.warn("[Roomie] profiles SELECT failed, falling back:", error.message);
+      console.warn(
+        "[Roomie] profiles SELECT failed, falling back:",
+        error.message
+      );
       return buildProfileFromUser(user);
+    }
+    // Self-healing: if the canonical profile knows a salon_id but the JWT
+    // metadata is still stale, sync it asynchronously so future hard-reloads
+    // route correctly even before the next profile fetch resolves.
+    if (
+      data &&
+      data.salon_id &&
+      user.user_metadata?.salon_id !== data.salon_id
+    ) {
+      supabase.auth
+        .updateUser({ data: { salon_id: data.salon_id, role: data.role } })
+        .catch(() => {
+          /* best effort */
+        });
     }
     return data || buildProfileFromUser(user);
   } catch (err) {
@@ -63,22 +82,28 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     let isMounted = true;
+    let latestSession = null;
+    let resolved = false;
 
-    // Hard timeout safety: never let the splash loader hang more than 12s
-    // (e.g. when Supabase is unreachable). After the timeout we surface the
-    // app in its anonymous state and let route guards handle redirects.
+    // Unconditional safety: if the auth chain hangs longer than 8s we release
+    // the splash. Critically, we do NOT clear `session` here — letting
+    // onAuthStateChange catch up later restores the user transparently.
     const failsafe = setTimeout(() => {
-      if (isMounted) {
-        setLoading((prev) => (prev ? false : prev));
+      if (!isMounted || resolved) return;
+      setLoading(false);
+      if (latestSession?.user) {
+        setProfile((prev) => prev || buildProfileFromUser(latestSession.user));
       }
-    }, 12000);
+    }, 8000);
 
     (async () => {
       try {
         const { data } = await supabase.auth.getSession();
         if (!isMounted) return;
-        setSession(data.session);
-        const p = await fetchProfile(data.session?.user);
+        resolved = true;
+        latestSession = data?.session || null;
+        setSession(latestSession);
+        const p = await fetchProfile(latestSession?.user);
         if (!isMounted) return;
         setProfile(p);
       } catch (err) {
@@ -91,6 +116,7 @@ export function AuthProvider({ children }) {
 
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       if (!isMounted) return;
+      latestSession = newSession;
       setSession(newSession);
       const p = await fetchProfile(newSession?.user);
       if (!isMounted) return;
@@ -141,6 +167,13 @@ export function AuthProvider({ children }) {
     return p;
   }, [session]);
 
+  /** Synchronously merge fields into the in-memory profile. Used after RPCs
+   * (e.g. create_my_salon) that we know already mutated the DB row so route
+   * guards can navigate immediately without waiting for a fetch round-trip. */
+  const applyLocalProfile = useCallback((patch) => {
+    setProfile((prev) => ({ ...(prev || {}), ...(patch || {}) }));
+  }, []);
+
   const value = useMemo(
     () => ({
       session,
@@ -156,8 +189,9 @@ export function AuthProvider({ children }) {
       signInWithGoogle,
       signOut,
       refreshProfile,
+      applyLocalProfile,
     }),
-    [session, profile, loading, signUp, signIn, signInWithGoogle, signOut, refreshProfile]
+    [session, profile, loading, signUp, signIn, signInWithGoogle, signOut, refreshProfile, applyLocalProfile]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
