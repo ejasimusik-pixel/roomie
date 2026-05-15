@@ -19,6 +19,14 @@ export default function ImageUploader({
   label = "Imagen",
   aspect = "square", // 'square' | 'wide' | 'tall'
   testId,
+  /**
+   * When true the component does NOT upload to Supabase Storage — it only
+   * keeps a local preview and calls `onFileSelected({ file })`. Use this in
+   * flows where the destination (e.g. salon_id) doesn't exist yet, and the
+   * parent will upload after the row is created.
+   */
+  deferred = false,
+  onFileSelected,
 }) {
   const inputRef = useRef(null);
   const [dragOver, setDragOver] = useState(false);
@@ -45,6 +53,13 @@ export default function ImageUploader({
       }
       const objectUrl = URL.createObjectURL(file);
       setLocalPreview(objectUrl);
+
+      // Deferred mode: don't upload, just expose the File to the parent.
+      if (deferred) {
+        onFileSelected?.({ file, previewUrl: objectUrl });
+        return;
+      }
+
       setBusy(true);
 
       const { url, path, error: upErr } = await uploadImage({
@@ -64,7 +79,7 @@ export default function ImageUploader({
       onUploaded?.({ url, path });
       // keep local preview but it'll match `value` once parent updates
     },
-    [bucket, scopeId, onUploaded]
+    [bucket, scopeId, onUploaded, deferred, onFileSelected]
   );
 
   const onInputChange = (e) => {

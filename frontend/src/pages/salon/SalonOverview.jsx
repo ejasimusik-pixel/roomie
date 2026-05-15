@@ -117,12 +117,28 @@ export default function SalonOverview() {
             </p>
           )}
         </div>
-        {salon?.logo_url && (
+        {salon?.logo_url ? (
           <img
-            src={salon.logo_url}
+            src={`${salon.logo_url}?t=${
+              salon?.updated_at ? new Date(salon.updated_at).getTime() : Date.now()
+            }`}
             alt={salon.name}
             className="w-14 h-14 rounded-2xl object-cover shadow-soft self-start sm:self-auto"
+            data-testid="salon-overview-logo"
+            onError={(e) => (e.currentTarget.style.display = "none")}
           />
+        ) : (
+          <span
+            className="w-14 h-14 rounded-2xl shadow-soft self-start sm:self-auto flex items-center justify-center text-white font-display font-extrabold text-xl"
+            style={{
+              background: `linear-gradient(135deg, ${
+                salon?.secondary_color || "#7C52AA"
+              } 0%, ${salon?.primary_color || "#E040A0"} 100%)`,
+            }}
+            data-testid="salon-overview-logo-fallback"
+          >
+            {(salon?.name || firstName)?.charAt(0)?.toUpperCase() || "R"}
+          </span>
         )}
       </header>
 

@@ -16,7 +16,7 @@ import { supabase } from "../../lib/supabase";
 import { mapSupabaseError } from "../../lib/errors";
 import ImageUploader from "../../components/ImageUploader";
 import AILogoModal from "../../components/AILogoModal";
-import { BUCKETS } from "../../lib/storage";
+import { BUCKETS, uploadImage } from "../../lib/storage";
 
 const COLOR_PRESETS = [
   { name: "Magenta", primary: "#E040A0", secondary: "#7C52AA" },
@@ -70,7 +70,10 @@ export default function OnboardingSalon() {
 
   const [serverError, setServerError] = useState(null);
   const [slugTouched, setSlugTouched] = useState(false);
-  const [logo, setLogo] = useState({ url: "", path: null });
+  // Deferred logo: we keep the picked File locally and upload AFTER the salon
+  // row exists (RLS on storage requires the path to start with salon_id).
+  const [logoFile, setLogoFile] = useState(null);
+  const [logoPreview, setLogoPreview] = useState("");
   const [aiOpen, setAiOpen] = useState(false);
 
   const nameValue = watch("name");
@@ -103,12 +106,13 @@ export default function OnboardingSalon() {
       sales_style: values.sales_style,
     };
 
+    // Step 1 — create the salon (no logo yet; storage RLS requires salon_id).
     const { data: newSalon, error } = await supabase.rpc("create_my_salon", {
       p_name: values.name.trim(),
       p_slug: slugify(values.slug || values.name),
       p_primary_color: values.primary_color,
       p_secondary_color: values.secondary_color,
-      p_logo_url: logo.url || null,
+      p_logo_url: null,
       p_whatsapp_number: values.whatsapp_number?.trim() || null,
       p_roomie_personality: roomie_personality,
     });
@@ -136,10 +140,28 @@ export default function OnboardingSalon() {
       return;
     }
 
+    // Step 2 — if a logo was picked, upload it now to `salon-logos/{salon_id}/`
+    // and patch the row. We don't block navigation on this: a soft-failure
+    // just leaves the salon without a logo (owner can re-upload later).
+    if (newSalon?.id && logoFile) {
+      const { url, error: upErr } = await uploadImage({
+        bucket: BUCKETS.SALON_LOGOS,
+        scopeId: newSalon.id,
+        file: logoFile,
+      });
+      if (!upErr && url) {
+        await supabase
+          .from("salons")
+          .update({ logo_url: url })
+          .eq("id", newSalon.id);
+      } else if (upErr) {
+        // eslint-disable-next-line no-console
+        console.warn("[Roomie] logo upload failed post-creation:", upErr);
+      }
+    }
+
     if (newSalon?.id) {
       // Apply locally so the next route render already has the right tenant.
-      // We intentionally don't update auth.users metadata here — fetchProfile's
-      // self-healing in AuthContext will sync it on the next reload.
       applyLocalProfile({ salon_id: newSalon.id, role: "salon_owner" });
     }
 
@@ -259,10 +281,17 @@ export default function OnboardingSalon() {
             <div className="mt-6 grid sm:grid-cols-[1fr_auto] gap-3 items-end">
               <ImageUploader
                 bucket={BUCKETS.SALON_LOGOS}
-                scopeId={profile?.id || "draft"}
-                value={logo.url}
-                onUploaded={({ url, path }) => setLogo({ url, path })}
-                onClear={() => setLogo({ url: "", path: null })}
+                scopeId="pending"
+                deferred
+                value={logoPreview}
+                onFileSelected={({ file, previewUrl }) => {
+                  setLogoFile(file);
+                  setLogoPreview(previewUrl);
+                }}
+                onClear={() => {
+                  setLogoFile(null);
+                  setLogoPreview("");
+                }}
                 label="Logo del salón (opcional)"
                 aspect="square"
                 testId="onboarding-logo-uploader"
@@ -451,8 +480,11 @@ export default function OnboardingSalon() {
         open={aiOpen}
         onClose={() => setAiOpen(false)}
         initialName={watch("name")}
-        scopeId={profile?.id || "draft"}
-        onGenerated={({ url, path }) => setLogo({ url, path })}
+        deferred
+        onGenerated={({ file, previewUrl }) => {
+          setLogoFile(file);
+          setLogoPreview(previewUrl);
+        }}
       />
     </div>
   );

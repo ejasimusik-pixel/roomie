@@ -12,7 +12,9 @@ import Unauthorized from "./pages/Unauthorized";
 import OnboardingSalon from "./pages/onboarding/OnboardingSalon";
 
 import ClientHome from "./pages/client/ClientHome";
+import Discover from "./pages/client/Discover";
 import Vision from "./pages/client/Vision";
+import PublicSalon from "./pages/PublicSalon";
 import SalonOverview from "./pages/salon/SalonOverview";
 import Services from "./pages/salon/Services";
 import Products from "./pages/salon/Products";
@@ -44,6 +46,7 @@ export default function App() {
       <Route path="/signup" element={<Signup />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/unauthorized" element={<Unauthorized />} />
+      <Route path="/discover/:slug" element={<PublicSalon />} />
 
       {/* Client workspace */}
       <Route
@@ -55,16 +58,7 @@ export default function App() {
         }
       >
         <Route index element={<ClientHome />} />
-        <Route
-          path="discover"
-          element={
-            <Placeholder
-              titleKey="nav.discover"
-              descKey="client.subtitle"
-              testId="client-discover"
-            />
-          }
-        />
+        <Route path="discover" element={<Discover />} />
         <Route path="vision" element={<Vision />} />
         <Route
           path="bookings"

@@ -85,6 +85,12 @@ export default function AILogoModal({
   initialName = "",
   scopeId,
   onGenerated,
+  /**
+   * Deferred mode: don't upload to Supabase Storage (because the salon doesn't
+   * exist yet). Returns `{ file, blob, previewUrl }` via onGenerated so the
+   * parent can upload after the salon row is created.
+   */
+  deferred = false,
 }) {
   const [name, setName] = useState(initialName);
   const [style, setStyle] = useState("minimal");
@@ -125,6 +131,15 @@ export default function AILogoModal({
         palette,
       });
       const file = new File([blob], "ai-logo.png", { type: "image/png" });
+
+      // Deferred mode: parent will upload after creating the salon row.
+      if (deferred) {
+        const localUrl = URL.createObjectURL(blob);
+        onGenerated?.({ file, blob, previewUrl: localUrl });
+        onClose?.();
+        return;
+      }
+
       const { url, path, error: upErr } = await uploadImage({
         bucket: BUCKETS.SALON_LOGOS,
         scopeId: scopeId || "draft",

@@ -1,0 +1,69 @@
+{
+  "summary": "Iteration 4 — Fase Final 1A retest after deferred logo + Discover + PublicSalon work landed. CORE FIXES VERIFIED: (1) Deferred logo onboarding works end-to-end: salon_owner signup → /onboarding/salon → file picker accepted (input type=file inside onboarding-logo-uploader) → submit → RPC create_my_salon → logo uploaded post-creation to bucket path 'salon-logos/{salon_id}/...' (NOT '{user_id}/...') → salons.logo_url patched → redirect to /salon → [data-testid='salon-overview-logo'] renders with the real public URL (https://dxfqnwdwqmuyyzpdlgcl.supabase.co/storage/v1/object/public/salon-logos/d7ebff18-.../...png?t=...). The previous RLS-on-storage bug is FIXED. (2) /discover/:slug for an ANON viewer (cookies+storage cleared) correctly renders [data-testid='public-salon-page'] with name, hero, monogram/logo, and the empty-state for services/products on a brand-new salon. (3) /discover/:slug with a non-existent slug correctly renders [data-testid='public-salon-notfound'] + back CTA. (4) SalonOverview KPIs (kpi-services/products/appointments=0) now render on a fresh salon — the iteration_3 Promise.all hang appears mitigated. NEW CRITICAL BUG SURFACED: /app/discover and /discover/:slug are PERMANENTLY STUCK in [data-testid='discover-loading']/[data-testid='public-salon-loading'] for an AUTHENTICATED salon_owner. After 15 s of polling on a logged-in session: discover-grid, discover-empty, discover-error all absent; loading skeleton remains. Same hang on /discover/{own-slug} when logged in as the owner. Anon access to the exact same /discover/{slug} URL works fine (verified). Root cause hypothesis: the supabase.from('salons').select(...).eq('is_active',true) query is being held open by RLS or by an auth refresh-token retry loop while the salon_owner JWT/profile is in a fresh state — same failure class as iteration_3's SalonOverview Promise.all hang. Mitigation should be the same pattern: add an AbortController / .abortSignal() + a hard timeout on the supabase select, switch the two queries to Promise.allSettled, and always setLoading(false) in a finally block. Discover.jsx currently has no timeout safety — if the first await never resolves, setLoading is never set to false. Also reproduced a minor React DOM nesting warning ('<a> cannot appear as a descendant of <a>') from PublicSalon header — Logo component renders an <a>, wrapped by a <Link to='/'>. AI Logo modal flow #4 was not explicitly exercised (the deferred file-picker pathway it shares with the manual uploader is verified end-to-end via submit). Mocked-by-design AI logo generator and Vision UI are intentional per agent_to_agent_context_note.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Discover (client/Discover.jsx)",
+        "issue": "Page stuck indefinitely in [data-testid='discover-loading'] skeletons for an authenticated salon_owner. After 15 s neither discover-grid nor discover-empty nor discover-error renders. setLoading(false) never reached because the first 'await supabase.from(salons).select(...).eq(is_active,true)' (or the follow-up services select) never resolves under the just-created salon_owner JWT. Same failure pattern as iteration_3's SalonOverview Promise.all hang. Anon access to the public route works fine — only the authed salon_owner session hangs.",
+        "selector": "[data-testid='discover-grid'] / [data-testid='discover-loading']",
+        "priority": "HIGH"
+      },
+      {
+        "component": "PublicSalon (/discover/:slug authed)",
+        "issue": "When the salon_owner is logged in and visits /discover/{their-own-slug}, neither [data-testid='public-salon-page'] nor [data-testid='public-salon-notfound'] renders within 15 s — page is stuck in [data-testid='public-salon-loading']. The same URL works for anon. Same root cause as Discover.jsx hang.",
+        "selector": "[data-testid='public-salon-page']",
+        "priority": "HIGH"
+      },
+      {
+        "component": "PublicSalon header",
+        "issue": "React DOM warning: 'validateDOMNesting(...): <a> cannot appear as a descendant of <a>'. The header <Link to='/'> wraps the <Logo> component which itself renders an <a>. Replace inner Logo's anchor with a span or remove the outer Link.",
+        "selector": "[data-testid='public-salon-home-link']",
+        "priority": "LOW"
+      },
+      {
+        "component": "ImageUploader preview testid",
+        "issue": "After set_input_files on the dropzone, the preview did render visually but [data-testid='onboarding-logo-uploader-preview'] was not queryable. Either the testid name is different (e.g. onboarding-logo-uploader-image) or only the dropzone testid is exported. The deferred file IS captured and uploaded post-creation (verified by final salon_overview_logo src), so functionally OK — only the preview-state testid is hard to assert.",
+        "selector": "[data-testid='onboarding-logo-uploader-preview']",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Authed salon_owner browsing /app/discover",
+        "issue": "Supabase select on `salons` never resolves for the freshly-created salon_owner session — likely RLS on `salons` for role=salon_owner is filtering through current_salon_id() / profiles.salon_id and the join/policy stalls. Add a hard timeout (e.g. 8 s) + Promise.allSettled + finally{setLoading(false)} in Discover.jsx so the user always sees either the list, the empty state, or an error chip.",
+        "affected_selectors": ["[data-testid='discover-loading']", "[data-testid='discover-grid']", "[data-testid='discover-empty']", "[data-testid='discover-error']"]
+      },
+      {
+        "flow": "Authed salon_owner viewing own public salon page",
+        "issue": "Same hang: PublicSalon.jsx awaits two supabase selects sequentially without timeout. Switch to Promise.allSettled where applicable, wrap in try/finally and surface a friendly error if the salons select fails or times out.",
+        "affected_selectors": ["[data-testid='public-salon-loading']", "[data-testid='public-salon-page']", "[data-testid='public-salon-notfound']"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_4.json"],
+  "action_items": [
+    "FIX Discover.jsx and PublicSalon.jsx: wrap the supabase selects in Promise.allSettled + a hard 8 s timeout, and put setLoading(false) inside a finally block. Surface error/timeout via [data-testid='discover-error'] / a non-found path on the public page.",
+    "Investigate the salons RLS policy for role=salon_owner: a public-style listing of all is_active salons should NOT depend on current_salon_id() being non-null. Either (a) add a permissive SELECT policy for any authenticated user to read public salon fields, or (b) drop the role-scoped policy check on the SELECT path so the listing succeeds for owners too.",
+    "Fix the nested <a> in PublicSalon.jsx header — wrap Logo without a Link or change Logo to a non-<a> element.",
+    "Optional: expose [data-testid='onboarding-logo-uploader-preview'] so QA can assert the preview state of the deferred picker."
+  ],
+  "critical_code_review_comments": [
+    "Discover.jsx: no try/finally and no timeout around the two awaits — any RLS-induced hang traps loading=true forever. This is exactly the same anti-pattern fixed previously in SalonOverview; copy the same Promise.allSettled + AbortController + finally treatment here.",
+    "PublicSalon.jsx: same anti-pattern — the awaits don't have timeouts; a hung salons select makes the page invisible to the owner. Anon access works because RLS treats the anon role with a cleaner policy path.",
+    "OnboardingSalon.jsx: deferred-logo upload-after-create flow is correctly implemented (path uses newSalon.id, soft-fails without blocking navigation). Good resilience pattern.",
+    "Logo + Link nesting in PublicSalon header triggers a DOM nesting warning — small cleanup."
+  ],
+  "updated_files": ["/app/test_reports/iteration_4.json"],
+  "success_rate": {
+    "backend": "skipped (frontend-only request)",
+    "frontend": "Critical paths PASS: (a) signup salon_owner→onboarding→deferred-logo→/salon redirect→salon-overview-logo with real Supabase URL using salon_id path, (b) /discover/{nonexistent}→public-salon-notfound, (c) /discover/{slug} ANON→public-salon-page with name+monogram+empty service/product states, (d) SalonOverview KPIs render 0 on fresh salon. FAIL: /app/discover authed hangs in skeleton, /discover/{own-slug} authed hangs in skeleton."
+  },
+  "test_credentials": "test_salon_pahebpcu@roomie.test / Roomie2026! (salon_owner) — fresh salon 'Aurora QA pahebpcu' / slug 'aurora-qa-pahebpcu' / id d7ebff18-f707-42d7-b9d8-8d752b6289f0 — created during this iteration via real /signup + create_my_salon RPC.",
+  "seed_data_creation": "One Supabase auth user + one salon via real signup→RPC. No backend seed touched. Logo PNG (256x256 magenta) uploaded to salon-logos/{salon_id}/.",
+  "retest_needed": true,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "After Discover.jsx + PublicSalon.jsx are hardened with Promise.allSettled + 8 s timeout + finally{setLoading(false)}, re-run: (1) login as test_salon_pahebpcu@roomie.test / Roomie2026!, go to /app/discover, expect discover-grid with discover-card-aurora-qa-pahebpcu visible inside 5 s; (2) visit /discover/aurora-qa-pahebpcu while logged in, expect public-salon-page + public-salon-monogram + public-salon-services-empty + public-salon-products-empty inside 5 s; (3) verify anon access still works (clear cookies + reload). The deferred-logo upload flow, salon-overview-logo, and notfound-on-bad-slug are GREEN and don't need to be re-checked. AI-logo modal deferred path was not explicitly clicked through — worth a quick smoke: open onboarding-ai-logo-btn → ai-logo-use → check logoPreview state changes and the AI-generated PNG is uploaded post-create. Note the React DOM nested <a> warning in PublicSalon header is harmless but should be cleaned up.",
+  "rca of the issue": "Discover.jsx and PublicSalon.jsx await supabase selects without a timeout or AbortController. Under an authenticated salon_owner JWT whose profile row was just patched via RPC, the RLS policy on `salons` (which likely joins through profiles or calls current_salon_id()) stalls — the supabase-js fetch never resolves. Because the IIFE has no try/finally and no timeout race, setLoading(false) is unreachable and the skeleton stays on screen forever. Mitigation: copy the SalonOverview iteration_3 pattern — Promise.allSettled for parallel queries, wrap the whole IIFE in try/finally, race each await against a 8s setTimeout reject, surface the failure mode as discover-error / public-salon-notfound. Long-term: relax the salons RLS SELECT policy so any authenticated role can read is_active=true salon list, not just anon."
+}
