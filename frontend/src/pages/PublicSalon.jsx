@@ -25,6 +25,7 @@ export default function PublicSalon() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,6 +44,7 @@ export default function PublicSalon() {
     (async () => {
       setLoading(true);
       setNotFound(false);
+      setLoadError(false);
       try {
         const sRes = await withTimeout(
           supabase
@@ -56,6 +58,10 @@ export default function PublicSalon() {
         );
 
         if (cancelled) return;
+        if (sRes?.error?.message === "timeout") {
+          setLoadError(true);
+          return;
+        }
         const s = sRes?.data;
         if (!s) {
           setNotFound(true);
@@ -91,7 +97,7 @@ export default function PublicSalon() {
         setServices(svcRes.status === "fulfilled" ? svcRes.value?.data || [] : []);
         setProducts(prdRes.status === "fulfilled" ? prdRes.value?.data || [] : []);
       } catch (e) {
-        if (!cancelled) setNotFound(true);
+        if (!cancelled) setLoadError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -110,26 +116,40 @@ export default function PublicSalon() {
   }
 
   if (notFound || !salon) {
+    const isTimeout = loadError && !salon;
     return (
       <div
         className="min-h-screen rm-bg-aurora flex items-center justify-center p-6"
-        data-testid="public-salon-notfound"
+        data-testid={isTimeout ? "public-salon-error" : "public-salon-notfound"}
       >
         <div className="rm-glass-strong rounded-3xl p-8 max-w-md text-center">
           <AlertCircle size={28} className="mx-auto text-magenta-500" />
           <h1 className="mt-3 font-display font-extrabold text-2xl text-violet-900">
-            Salón no encontrado
+            {isTimeout ? "No pudimos cargar el salón" : "Salón no encontrado"}
           </h1>
           <p className="mt-2 text-violet-500 text-sm">
-            Puede que el enlace haya cambiado o el salón ya no esté disponible.
+            {isTimeout
+              ? "Hubo un problema al traer la información. Intenta de nuevo en unos segundos."
+              : "Puede que el enlace haya cambiado o el salón ya no esté disponible."}
           </p>
-          <Link
-            to="/app/discover"
-            className="rm-btn-primary mt-5 inline-flex"
-            data-testid="public-salon-back-cta"
-          >
-            <ArrowLeft size={16} /> Volver a Discover
-          </Link>
+          <div className="mt-5 flex gap-2 justify-center">
+            {isTimeout && (
+              <button
+                onClick={() => window.location.reload()}
+                className="rm-btn-primary"
+                data-testid="public-salon-retry"
+              >
+                Reintentar
+              </button>
+            )}
+            <Link
+              to="/app/discover"
+              className={isTimeout ? "rm-btn-ghost" : "rm-btn-primary"}
+              data-testid="public-salon-back-cta"
+            >
+              <ArrowLeft size={16} /> Volver a Discover
+            </Link>
+          </div>
         </div>
       </div>
     );

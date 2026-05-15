@@ -8,122 +8,108 @@
 ### Original Problem Statement (verbatim)
 Crear la arquitectura base de una plataforma SaaS PWA llamada ROOMIE.
 
-- Stack: Supabase (Auth + PostgreSQL), arquitectura PWA, mobile-first responsive.
-- Diseño: Luxury Minimal, Glassmorphism, Manrope, gradientes pastel (rosa #f9a8d4, azul #4285F4), sombras suaves, interfaz femenina premium.
+- Stack: Supabase (Auth + PostgreSQL + Storage), arquitectura PWA, mobile-first responsive.
+- Diseño: Luxury Minimal, Glassmorphism, Manrope, gradientes pastel (rosa #f9a8d4, azul #4285F4).
 - Roles: `client`, `salon_owner`, `admin`.
 - Páginas: Landing, Auth, Dashboard cliente, Workspace salón, Panel admin.
 - Login: Google OAuth + email/password.
 - Multi-tenant: todas las entidades llevarán `salon_id`.
 - Rutas protegidas por rol.
-- Navegación responsive.
-- **NO implementar todavía**: IA, pagos, promo codes.
+- **NO implementar todavía**: IA real, pagos, promo codes.
 
 ---
 
 ### Architecture
 - **Frontend**: React 18 (CRA), `react-router-dom` v6, `@supabase/supabase-js` v2, `react-i18next`, `react-hook-form`, `lucide-react`, Tailwind 3. PWA-ready.
-- **Backend**: 100% Supabase (PostgreSQL + Auth + RLS). El archivo `/app/backend/server.py` es sólo un health-stub.
-- **Auth**: Supabase client desde el browser. Las credenciales reales están en `/app/frontend/.env`. Hay un fallback automático a un mock localStorage cuando las keys están vacías (modo demo).
-- **Multi-tenant**: tabla `salons` como raíz. Todas las tablas derivadas llevan `salon_id`. `profiles.salon_id` es nullable (admin global + clientas sin salón).
-- **RLS activo desde el primer día** con dos helpers `security definer` (`public.current_role()`, `public.current_salon_id()`) para evitar recursión.
-- **i18n**: Español por defecto, inglés disponible, toggle persistente.
-
-### Tech Stack
-| Capa | Tecnología |
-|---|---|
-| UI | React 18, Tailwind 3, Manrope, lucide-react |
-| Routing | react-router-dom v6 |
-| Forms | react-hook-form |
-| Auth/DB | Supabase (real conectado: `dxfqnwdwqmuyyzpdlgcl.supabase.co`) |
-| i18n | i18next + react-i18next |
-| PWA | manifest.json + meta theme-color + apple-touch-icon |
-| Backend stub | FastAPI (health only) |
-
-### Database schema (v1)
-Migración: `/app/supabase/migrations/0001_initial.sql`
-
-Tablas: `salons`, `profiles`, `services`, `products`, `appointments`, `client_profiles`, `hair_profiles`, `onboarding_answers`.
-
-Características clave:
-- Todas las tablas tienen `created_at`/`updated_at` (mantenidos por trigger compartido).
-- Todas las tablas excepto `salons` llevan `salon_id`.
-- `profiles.salon_id` es nullable por diseño.
-- `roomie_personality jsonb` en `salons` (reservado para IA contextual futura).
-- Trigger `on_auth_user_created` en `auth.users` provisiona `profiles` automáticamente leyendo `role`/`salon_id`/`full_name` desde `raw_user_meta_data`.
-- RLS policies cubren `client`, `salon_owner` y `admin` con scoping multi-tenant.
-- Índices: `salon_id` en cada tabla, `slug` en salons, `(salon_id, starts_at)` en appointments, etc.
+- **Backend**: 100% Supabase (PostgreSQL + Auth + RLS + Storage). `/app/backend/server.py` es sólo un health-stub.
+- **Auth**: Supabase client desde el browser.
+- **Multi-tenant**: tabla `salons` como raíz; todas las tablas derivadas llevan `salon_id`.
+- **RLS activo desde el primer día** con dos helpers `security definer` (`current_role()`, `current_salon_id()`).
+- **i18n**: Español por defecto.
 
 ### File Layout (frontend)
 ```
 src/
-├── App.js, index.js, index.css
-├── lib/{supabase.js, i18n.js}
-├── locales/{es,en}.json
-├── context/AuthContext.jsx     # lee profile desde public.profiles vía Supabase
-├── components/{Logo, AppShell, Sidebar, TopBar, BottomNav, ProtectedRoute, GlassCard, StatCard}.jsx
+├── lib/{supabase.js, storage.js, catalog.js, ai.js, i18n.js, errors.js}
+├── context/AuthContext.jsx
+├── components/{Logo, AppShell, Sidebar, TopBar, BottomNav, ProtectedRoute, GlassCard, ImageUploader, AILogoModal, Modal, ...}
 └── pages/
-    ├── Landing.jsx, Unauthorized.jsx, Placeholder.jsx
+    ├── Landing.jsx, PublicSalon.jsx, Unauthorized.jsx, Placeholder.jsx
     ├── auth/{Login, Signup, AuthCallback}.jsx
-    ├── client/ClientHome.jsx
-    ├── salon/SalonOverview.jsx
+    ├── onboarding/OnboardingSalon.jsx
+    ├── client/{ClientHome, Discover, Vision}.jsx
+    ├── salon/{SalonOverview, Services, Products}.jsx
     └── admin/AdminOverview.jsx
 ```
 
+### Database (migrations)
+- `0001_initial.sql` — tablas + RLS + triggers + helpers
+- `0002_create_my_salon.sql` — RPC atómica para onboarding
+- `0003_storage_and_catalog.sql` — buckets + columnas extras
+- **`0004_fix_salons_rls.sql`** — fix de RLS sobre `salons.select` para authenticated (era el bug de hang/timeout en Discover y PublicSalon)
+
 ### User Personas
-1. **Sofía — Clienta premium** (rol `client`).
-2. **Valentina — Propietaria de salón** (rol `salon_owner`).
-3. **Roomie Admin** (rol `admin`).
+1. **Sofía — Clienta premium** (rol `client`)
+2. **Valentina — Propietaria de salón** (rol `salon_owner`)
+3. **Roomie Admin** (rol `admin`)
 
 ### Core Requirements (status)
-- [x] Multi-tenant con `salon_id` en todas las tablas.
-- [x] Auth con email/password y botón Google OAuth listo.
-- [x] Rutas protegidas por rol.
-- [x] Navegación responsive (sidebar desktop + bottom-nav mobile + drawer menu).
-- [x] Estructura escalable.
-- [x] UI Luxury Minimal con glassmorphism, Manrope, gradiente azul→violeta→magenta.
-- [x] i18n ES/EN con switch persistente.
-- [x] PWA-ready.
-- [x] Schema SQL multi-tenant con RLS activo.
-- [x] AuthContext leyendo `public.profiles` con fallback graceful.
+- [x] Multi-tenant con `salon_id` en todas las tablas
+- [x] Auth email/password + Google OAuth
+- [x] Rutas protegidas por rol
+- [x] Navegación responsive (sidebar + bottom-nav + drawer)
+- [x] UI Luxury Minimal con glassmorphism + Manrope + gradientes pastel
+- [x] i18n ES/EN
+- [x] PWA-ready
+- [x] Schema multi-tenant con RLS
+- [x] Onboarding de salón (RPC atómica)
+- [x] CRUD real de Services + Products (con Storage)
+- [x] AI Hooks UI (Logo Studio, Vision) — mock por diseño
+- [x] **Discover real** conectado a `public.salons` (Fase Final 1A)
+- [x] **Página pública `/discover/:slug`** con servicios/productos/WhatsApp (Fase Final 1A)
+- [x] **Fix bug logo upload** end-to-end (deferred upload → post-create) (Fase Final 1A)
+- [x] **AI scaffolding** (`lib/ai.js`) listo para extracción de productos por imagen/URL y sugerencias futuras
 
 ### Timeline
-**2026-01-15 — MVP architecture v1** (Fases 1-3, ya documentado)
+- **2026-01-15** — MVP architecture v1 (Fases 1–3)
+- **2026-01-15** — Fase 4: Core Business Layer (Services/Products CRUD + Storage + AI hooks UI)
+- **2026-02-15** — Fase Final 1A: Discover real + página pública `/discover/:slug` + logo fix end-to-end + AI scaffolding
 
-**2026-01-15 — Fase 4 · Core Business Layer + AI Hooks**
-- **Catálogo real**: tablas `services` y `products` totalmente conectadas con CRUD luxury-minimal (modales, cards, empty states, toggles activo/borrador, eliminación con confirm).
-- **9 categorías** de servicios: cabello, uñas, cejas, pestañas, facial, spa, maquillaje, wellness, otro.
-- **Productos** con marca, tipo, precio, "recomendado para" (tags por coma), imagen, activo/borrador.
-- **SalonOverview real** con KPIs vivos de Supabase (servicios activos, productos activos, citas futuras) y empty state "Sin citas próximas — ve creando tu catálogo".
-- **Supabase Storage** con 4 buckets: `salon-logos`, `service-images`, `product-images` (públicos) + `client-uploads` (privado para Roomie Vision). Drag&drop con preview, validación PNG/JPG/WebP, máx 5MB.
-- **AI Logo Studio** (modal premium): selector de estilo (minimal/glam/natural/luxury), 6 paletas, generación de monograma en canvas, upload directo a Storage. UX preparada para sustituir el render local por una llamada multimodal cuando llegue la IA real.
-- **Roomie Vision** (Beta) en `/app/vision`: upload de selfie al bucket privado, transición "preparing your look", propuesta visual mocked (look, manicura, maquillaje, mood + paleta).
-- **AuthContext robusto**: failsafe 3.5s, `applyLocalProfile` para evitar flashes en redirects post-RPC, fallback a metadata si fetch del profile falla.
-- **Timeouts defensivos**: cada query de SalonOverview (5s) y cada insert/update de Services/Products (10s) tienen race contra timeout para evitar UI en "Guardando…" indefinido.
-- **Bug encontrado y documentado**: el SDK de Supabase tiene un *cold-start lag* tras el signup donde las primeras operaciones de DB (queries y RPCs) pueden tardar 10-15s en emitir HTTP. En uso real no afecta porque el usuario explora la UI antes de crear servicios; en tests requiere `await` adicional.
+### Fase Final 1A — detalle de cambios (2026-02-15)
+**Bugs críticos resueltos**
+- Logo upload onboarding: las políticas RLS de `storage` exigen path `{salon_id}/...`. Antes se subía a `{user_id}/...` ANTES de crear el salón → RLS bloqueaba.
+  - Fix: modo `deferred` en `ImageUploader` y `AILogoModal`. El File se queda en memoria. Después del RPC `create_my_salon` se sube con `scopeId={newSalon.id}` y se persiste vía `update salons set logo_url=...`.
+- Discover/PublicSalon hang para usuarios authenticated: la RLS `salons_select_authenticated` con `is_active or is_admin()` provocaba evaluación per-row bajo JWT autenticado.
+  - Fix server: migración `0004_fix_salons_rls.sql` con policy plana `using (is_active = true)` para anon + authenticated.
+  - Fix cliente: `Promise.race` con timeout de 8s, `try/finally` con `setLoading(false)` garantizado, estado de timeout disambiguado de notfound.
+
+**Componentes nuevos**
+- `pages/client/Discover.jsx` — listado real de salones activos con tarjetas premium (gradiente del salón, logo/monograma fallback, categorías inferidas de servicios)
+- `pages/PublicSalon.jsx` — página pública sin login con hero, personality chips, servicios, productos y WhatsApp CTA
+- `lib/ai.js` — scaffolding ligero para futuras integraciones (extractFromImage, extractFromUrl, suggestServices, composeReply)
 
 ### Prioritized Backlog
 
-**P0 — Activar el backend real (acción manual del usuario)**
-- [ ] Ejecutar `0001_initial.sql` en el SQL Editor de Supabase.
-- [ ] Configurar redirect URL (`/auth/callback`) en Authentication → URL Configuration.
-- [ ] Promover primera cuenta admin (`update profiles set role='admin' where email=…`).
-- [ ] Configurar Google como Auth Provider en Supabase (Client ID/Secret).
+**P0 — Acción manual del usuario**
+- [ ] Ejecutar `0004_fix_salons_rls.sql` en Supabase SQL Editor (sin esto, los usuarios authenticated verán "Reintentar" en Discover y "No pudimos cargar el salón" en `/discover/:slug`)
 
-**P1 — Datos reales en UI**
-- [ ] Reemplazar mocks visuales del cliente y salón por queries a Supabase.
-- [ ] CRUD de servicios/productos en el workspace del salón.
-- [ ] CRUD de appointments con calendar view.
-- [ ] Subida de avatar + logos a Supabase Storage.
+**P1 — IA real (próxima fase)**
+- [ ] AI Logo Generator real (reemplazar canvas con multimodal model)
+- [ ] AI Vision real para `/app/vision` (selfie → look propuesto)
+- [ ] AI Product Extraction (imagen → autofill)
+- [ ] AI Product Extraction (URL → autofill)
+- [ ] Suggestions: "Tus clientas aman balayage", "agrega gloss", etc.
 
-**P2 — Funcionalidades diferidas (declaradas NO en MVP)**
-- [ ] Onboarding emocional de 3 pasos (cabello + piel + estilo de vida).
-- [ ] IA concierge sobre `roomie_personality` + `hair_profiles`.
-- [ ] Pagos (Stripe / MercadoPago).
-- [ ] Promo codes.
-- [ ] Métricas reales en panel admin.
+**P2 — Funcionalidades diferidas**
+- [ ] Onboarding emocional 3 pasos (hair/skin/lifestyle)
+- [ ] Pagos (Stripe / MercadoPago)
+- [ ] Promo codes
+- [ ] Métricas reales en admin panel
+- [ ] Calendar view de citas
+- [ ] Push notifications
 
 ### Next Tasks
-1. Usuario ejecuta `0001_initial.sql` en Supabase.
-2. Usuario hace primer signup; verificamos que el trigger crea su `profiles` row.
-3. Promovemos esa cuenta a `admin`.
-4. Empezamos a conectar UI a datos reales empezando por dashboard salón (services + appointments).
+1. Usuario ejecuta `0004_fix_salons_rls.sql` en Supabase.
+2. Validar que Discover authed muestra `discover-grid` con cards.
+3. Validar que `/discover/:slug` authed muestra el salón completo.
+4. Comenzar Fase 5 — IA real (Logo Studio + Vision multimodality).

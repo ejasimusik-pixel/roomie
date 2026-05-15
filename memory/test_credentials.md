@@ -1,46 +1,44 @@
 # ROOMIE — Test Credentials
 
-> **Estado actual**: Supabase real está conectado (`dxfqnwdwqmuyyzpdlgcl.supabase.co`).
-> Las credenciales demo en localStorage **ya no funcionan** porque la app ahora
-> usa el cliente real de Supabase, NO el mock.
+> **Estado actual**: Supabase real conectado (`dxfqnwdwqmuyyzpdlgcl.supabase.co`).
 
-## Backend conectado
+## Backend
 - **SUPABASE_URL**: `https://dxfqnwdwqmuyyzpdlgcl.supabase.co`
-- **SUPABASE_ANON_KEY**: `sb_publishable_P7JnJVV1mR1QS_F8I4gifA_X7Isz68K` (publishable — segura para browser)
+- **SUPABASE_ANON_KEY**: `sb_publishable_P7JnJVV1mR1QS_F8I4gifA_X7Isz68K`
 - Configuradas en `/app/frontend/.env`.
 
-## Cómo crear cuentas de prueba
+## Cuentas reales creadas
 
-1. Ejecutar la migración `0001_initial.sql` en el SQL Editor de Supabase.
-2. En la app (`/signup`), registrar 1 cuenta por rol:
-   - Una con rol `Clienta` → quedará en `profiles` con `role = 'client'`.
-   - Una con rol `Propietaria de salón` → quedará con `role = 'salon_owner'`, `salon_id = NULL`.
-3. **Promover una cuenta a admin** desde el SQL Editor:
+| Email | Password | Rol | Salón |
+| ----- | -------- | --- | ----- |
+| `test_salon_pahebpcu@roomie.test` | `Roomie2026!` | `salon_owner` | `aurora-qa-pahebpcu` (id `d7ebff18-f707-42d7-b9d8-8d752b6289f0`) |
+
+> Esta cuenta fue creada durante el testing del flujo de onboarding + logo deferred upload. Tiene logo PNG real en `salon-logos/d7ebff18-.../...png` y se puede usar para validar Discover, PublicSalon y el flujo entero.
+
+## Cómo crear cuentas adicionales
+
+1. Migraciones requeridas en Supabase SQL Editor (en orden):
+   - `0001_initial.sql`
+   - `0002_create_my_salon.sql`
+   - `0003_storage_and_catalog.sql`
+   - **`0004_fix_salons_rls.sql`** (CRÍTICA para que Discover funcione con authenticated users)
+
+2. En `/signup` registrar la cuenta deseada y seleccionar rol.
+
+3. (Opcional) Promover a admin desde SQL Editor:
    ```sql
    update public.profiles set role = 'admin' where email = 'tu-email@example.com';
    ```
-4. **Asignar un salón a la propietaria** (después de crear el salón):
-   ```sql
-   -- Primero crea el salón:
-   insert into public.salons (name, slug) values ('Aurora Beauty Lab', 'aurora-beauty-lab') returning id;
-   -- Luego asigna a la propietaria (sustituye los UUIDs):
-   update public.profiles set salon_id = '<SALON_UUID>' where email = 'salon@example.com';
-   ```
 
 ## Rutas por rol (post-login)
-| Rol           | Landing tras login | Permisos                                  |
-| ------------- | ------------------ | ----------------------------------------- |
-| `client`      | `/app`             | sólo `/app/*`                             |
-| `salon_owner` | `/salon`           | `/salon/*` y `/app/*`                     |
-| `admin`       | `/admin`           | acceso total                              |
+| Rol | Landing tras login | Permisos |
+| --- | ------------------ | -------- |
+| `client` | `/app` | `/app/*` |
+| `salon_owner` | `/salon` | `/salon/*` + `/app/*` |
+| `admin` | `/admin` | acceso total |
 
-## Volver a modo demo (si necesitas testear sin Supabase)
+## Rutas públicas (sin login)
+- `/discover/:slug` — perfil público de cualquier salón activo
 
-Vacía las variables en `/app/frontend/.env`:
-```
-REACT_APP_SUPABASE_URL=
-REACT_APP_SUPABASE_ANON_KEY=
-```
-Reinicia frontend (`sudo supervisorctl restart frontend`). Las 3 cuentas demo
-(`cliente@roomie.demo`, `salon@roomie.demo`, `admin@roomie.demo` con pass
-`Roomie2026!`) volverán a sembrarse automáticamente en localStorage.
+## Bug crítico activo (pendiente fix manual de SQL)
+Si los usuarios autenticados ven "Reintentar" en `/app/discover` o "No pudimos cargar el salón" en `/discover/:slug` → falta correr `0004_fix_salons_rls.sql` en Supabase SQL Editor.
