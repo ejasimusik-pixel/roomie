@@ -87,22 +87,19 @@ src/
 - [x] AuthContext leyendo `public.profiles` con fallback graceful.
 
 ### Timeline
-**2026-01-15 — MVP architecture v1**
-- Frontend completo, todos los flujos auth funcionando contra mock.
-- Backend stub.
-- Testing 100% (33/33 frontend, 3/3 backend).
+**2026-01-15 — MVP architecture v1** (Fases 1-3, ya documentado)
 
-**2026-01-15 — Supabase real conectado**
-- Keys reales en `/app/frontend/.env` (`dxfqnwdwqmuyyzpdlgcl`).
-- `AuthContext` ahora consulta `public.profiles` (con fallback a metadata si la migración aún no se ha ejecutado).
-- Login contra Supabase real verificado (errores reales del servicio).
-- Migración SQL completa generada en `/app/supabase/migrations/0001_initial.sql` (pendiente: usuario debe ejecutarla en el SQL Editor).
-
-**2026-01-15 — Onboarding del salón**
-- Nueva migración `0002_create_my_salon.sql` con función RPC `public.create_my_salon(...)` (security definer) que valida que el caller es `salon_owner` sin `salon_id`, crea la fila en `salons` y actualiza `profiles.salon_id` atómicamente.
-- Nueva página `/onboarding/salon` (Manrope · glassmorphism · 3 secciones: Identidad, Paleta visual, Voz de Roomie) con live preview, presets de color y campos `roomie_personality` (tone/style/emoji_level/sales_style).
-- Componente `SalonOnboardingGate` que envuelve `/salon/*` y redirige a `/onboarding/salon` cuando `role='salon_owner' AND salon_id IS NULL`.
-- Tras crear el salón, `refreshProfile()` actualiza el contexto y redirige a `/salon`.
+**2026-01-15 — Fase 4 · Core Business Layer + AI Hooks**
+- **Catálogo real**: tablas `services` y `products` totalmente conectadas con CRUD luxury-minimal (modales, cards, empty states, toggles activo/borrador, eliminación con confirm).
+- **9 categorías** de servicios: cabello, uñas, cejas, pestañas, facial, spa, maquillaje, wellness, otro.
+- **Productos** con marca, tipo, precio, "recomendado para" (tags por coma), imagen, activo/borrador.
+- **SalonOverview real** con KPIs vivos de Supabase (servicios activos, productos activos, citas futuras) y empty state "Sin citas próximas — ve creando tu catálogo".
+- **Supabase Storage** con 4 buckets: `salon-logos`, `service-images`, `product-images` (públicos) + `client-uploads` (privado para Roomie Vision). Drag&drop con preview, validación PNG/JPG/WebP, máx 5MB.
+- **AI Logo Studio** (modal premium): selector de estilo (minimal/glam/natural/luxury), 6 paletas, generación de monograma en canvas, upload directo a Storage. UX preparada para sustituir el render local por una llamada multimodal cuando llegue la IA real.
+- **Roomie Vision** (Beta) en `/app/vision`: upload de selfie al bucket privado, transición "preparing your look", propuesta visual mocked (look, manicura, maquillaje, mood + paleta).
+- **AuthContext robusto**: failsafe 3.5s, `applyLocalProfile` para evitar flashes en redirects post-RPC, fallback a metadata si fetch del profile falla.
+- **Timeouts defensivos**: cada query de SalonOverview (5s) y cada insert/update de Services/Products (10s) tienen race contra timeout para evitar UI en "Guardando…" indefinido.
+- **Bug encontrado y documentado**: el SDK de Supabase tiene un *cold-start lag* tras el signup donde las primeras operaciones de DB (queries y RPCs) pueden tardar 10-15s en emitir HTTP. En uso real no afecta porque el usuario explora la UI antes de crear servicios; en tests requiere `await` adicional.
 
 ### Prioritized Backlog
 

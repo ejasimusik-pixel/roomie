@@ -136,17 +136,10 @@ export default function OnboardingSalon() {
       return;
     }
 
-    // Mirror salon_id into auth.users.user_metadata so any later hard-reload
-    // that races the `profiles` SELECT still resolves to the right tenant via
-    // the metadata-based fallback in AuthContext. Fire-and-forget so it never
-    // blocks the redirect.
     if (newSalon?.id) {
-      supabase.auth
-        .updateUser({ data: { salon_id: newSalon.id } })
-        .catch(() => {
-          /* best effort — AuthContext self-heals on next profile fetch */
-        });
       // Apply locally so the next route render already has the right tenant.
+      // We intentionally don't update auth.users metadata here — fetchProfile's
+      // self-healing in AuthContext will sync it on the next reload.
       applyLocalProfile({ salon_id: newSalon.id, role: "salon_owner" });
     }
 

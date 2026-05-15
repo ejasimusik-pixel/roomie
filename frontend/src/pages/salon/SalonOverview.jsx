@@ -32,44 +32,66 @@ export default function SalonOverview() {
     setLoading(true);
     setError(null);
 
+    const withTimeout = (p, ms = 5000) =>
+      Promise.race([
+        p,
+        new Promise((resolve) =>
+          setTimeout(
+            () => resolve({ error: { message: "Tiempo de espera agotado." } }),
+            ms
+          )
+        ),
+      ]);
+
     const now = new Date().toISOString();
-    const [svcRes, prdRes, apRes, sRes] = await Promise.all([
-      supabase
-        .from("services")
-        .select("id", { count: "exact", head: true })
-        .eq("salon_id", salonId)
-        .eq("is_active", true),
-      supabase
-        .from("products")
-        .select("id", { count: "exact", head: true })
-        .eq("salon_id", salonId)
-        .eq("is_active", true),
-      supabase
-        .from("appointments")
-        .select(
-          "id, starts_at, ends_at, status, notes, services(name, duration_minutes), profiles:client_id(full_name)"
-        )
-        .eq("salon_id", salonId)
-        .gte("starts_at", now)
-        .order("starts_at", { ascending: true })
-        .limit(5),
-      supabase.from("salons").select("*").eq("id", salonId).maybeSingle(),
-    ]);
+    try {
+      const [svcRes, prdRes, apRes, sRes] = await Promise.all([
+        withTimeout(
+          supabase
+            .from("services")
+            .select("id", { count: "exact", head: true })
+            .eq("salon_id", salonId)
+            .eq("is_active", true)
+        ),
+        withTimeout(
+          supabase
+            .from("products")
+            .select("id", { count: "exact", head: true })
+            .eq("salon_id", salonId)
+            .eq("is_active", true)
+        ),
+        withTimeout(
+          supabase
+            .from("appointments")
+            .select(
+              "id, starts_at, ends_at, status, notes, services(name, duration_minutes), profiles:client_id(full_name)"
+            )
+            .eq("salon_id", salonId)
+            .gte("starts_at", now)
+            .order("starts_at", { ascending: true })
+            .limit(5)
+        ),
+        withTimeout(
+          supabase.from("salons").select("*").eq("id", salonId).maybeSingle()
+        ),
+      ]);
 
-    const firstError =
-      svcRes.error || prdRes.error || apRes.error || sRes.error;
-    if (firstError) {
-      setError(mapSupabaseError(firstError));
+      const firstError =
+        svcRes?.error || prdRes?.error || apRes?.error || sRes?.error;
+      if (firstError) {
+        setError(mapSupabaseError(firstError));
+      }
+
+      setStats({
+        services: svcRes?.count ?? 0,
+        products: prdRes?.count ?? 0,
+        appointments: apRes?.data?.length ?? 0,
+      });
+      setUpcoming(apRes?.data || []);
+      setSalon(sRes?.data || null);
+    } finally {
+      setLoading(false);
     }
-
-    setStats({
-      services: svcRes.count ?? 0,
-      products: prdRes.count ?? 0,
-      appointments: apRes.data?.length ?? 0,
-    });
-    setUpcoming(apRes.data || []);
-    setSalon(sRes.data || null);
-    setLoading(false);
   }, [salonId]);
 
   useEffect(() => {

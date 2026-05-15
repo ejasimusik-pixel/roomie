@@ -54,20 +54,6 @@ async function fetchProfile(user) {
       );
       return buildProfileFromUser(user);
     }
-    // Self-healing: if the canonical profile knows a salon_id but the JWT
-    // metadata is still stale, sync it asynchronously so future hard-reloads
-    // route correctly even before the next profile fetch resolves.
-    if (
-      data &&
-      data.salon_id &&
-      user.user_metadata?.salon_id !== data.salon_id
-    ) {
-      supabase.auth
-        .updateUser({ data: { salon_id: data.salon_id, role: data.role } })
-        .catch(() => {
-          /* best effort */
-        });
-    }
     return data || buildProfileFromUser(user);
   } catch (err) {
     console.warn("[Roomie] profiles fetch threw, falling back:", err);
@@ -85,16 +71,16 @@ export function AuthProvider({ children }) {
     let latestSession = null;
     let resolved = false;
 
-    // Unconditional safety: if the auth chain hangs longer than 8s we release
-    // the splash. Critically, we do NOT clear `session` here — letting
-    // onAuthStateChange catch up later restores the user transparently.
+    // Unconditional safety: release the splash after 3.5s. The metadata-based
+    // fallback ensures route guards have enough info to make a decision even
+    // before the canonical profile lands.
     const failsafe = setTimeout(() => {
       if (!isMounted || resolved) return;
       setLoading(false);
       if (latestSession?.user) {
         setProfile((prev) => prev || buildProfileFromUser(latestSession.user));
       }
-    }, 8000);
+    }, 3500);
 
     (async () => {
       try {

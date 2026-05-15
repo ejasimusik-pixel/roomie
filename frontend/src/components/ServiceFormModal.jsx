@@ -49,31 +49,49 @@ export default function ServiceFormModal({
 
   const onSubmit = async (values) => {
     setServerError(null);
+
+    const priceRaw = values.price_cents;
+    const priceNum = Number(priceRaw);
+    if (priceRaw === "" || priceRaw == null || Number.isNaN(priceNum) || priceNum < 0) {
+      setServerError("Precio inválido. Usa un número mayor o igual a 0.");
+      return;
+    }
+
     const payload = {
       salon_id: salonId,
       name: values.name.trim(),
       description: values.description?.trim() || null,
       category: values.category,
-      duration_minutes: Number(values.duration_minutes),
-      price_cents: Math.round(Number(values.price_cents || 0) * 100),
+      duration_minutes: Number(values.duration_minutes) || 60,
+      price_cents: Math.round(priceNum * 100),
       currency: values.currency || CURRENCY_DEFAULT,
       image_url: image.url || null,
       is_active: !!values.is_active,
     };
 
     let res;
-    if (editing) {
-      res = await supabase
-        .from("services")
-        .update(payload)
-        .eq("id", service.id)
-        .select()
-        .single();
-    } else {
-      res = await supabase.from("services").insert(payload).select().single();
+    try {
+      const op = editing
+        ? supabase.from("services").update(payload).eq("id", service.id).select().single()
+        : supabase.from("services").insert(payload).select().single();
+      res = await Promise.race([
+        op,
+        new Promise((resolve) =>
+          setTimeout(
+            () =>
+              resolve({
+                error: { message: "La operación tardó demasiado. Intenta de nuevo." },
+              }),
+            10000
+          )
+        ),
+      ]);
+    } catch (err) {
+      setServerError(mapSupabaseError(err));
+      return;
     }
 
-    if (res.error) {
+    if (res?.error) {
       setServerError(mapSupabaseError(res.error));
       return;
     }

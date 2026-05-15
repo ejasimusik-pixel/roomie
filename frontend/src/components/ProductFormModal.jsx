@@ -46,6 +46,14 @@ export default function ProductFormModal({
 
   const onSubmit = async (values) => {
     setServerError(null);
+
+    const priceRaw = values.price_cents;
+    const priceNum = Number(priceRaw);
+    if (priceRaw === "" || priceRaw == null || Number.isNaN(priceNum) || priceNum < 0) {
+      setServerError("Precio inválido. Usa un número mayor o igual a 0.");
+      return;
+    }
+
     const recommendedArr = (values.recommended_for || "")
       .split(",")
       .map((s) => s.trim())
@@ -57,7 +65,7 @@ export default function ProductFormModal({
       brand: values.brand?.trim() || null,
       description: values.description?.trim() || null,
       category: values.category,
-      price_cents: Math.round(Number(values.price_cents || 0) * 100),
+      price_cents: Math.round(priceNum * 100),
       currency: values.currency || CURRENCY_DEFAULT,
       recommended_for: recommendedArr,
       image_url: image.url || null,
@@ -65,18 +73,28 @@ export default function ProductFormModal({
     };
 
     let res;
-    if (editing) {
-      res = await supabase
-        .from("products")
-        .update(payload)
-        .eq("id", product.id)
-        .select()
-        .single();
-    } else {
-      res = await supabase.from("products").insert(payload).select().single();
+    try {
+      const op = editing
+        ? supabase.from("products").update(payload).eq("id", product.id).select().single()
+        : supabase.from("products").insert(payload).select().single();
+      res = await Promise.race([
+        op,
+        new Promise((resolve) =>
+          setTimeout(
+            () =>
+              resolve({
+                error: { message: "La operación tardó demasiado. Intenta de nuevo." },
+              }),
+            10000
+          )
+        ),
+      ]);
+    } catch (err) {
+      setServerError(mapSupabaseError(err));
+      return;
     }
 
-    if (res.error) {
+    if (res?.error) {
       setServerError(mapSupabaseError(res.error));
       return;
     }
@@ -170,7 +188,7 @@ export default function ProductFormModal({
               <label className="rm-label">Tipo</label>
               <select
                 className="rm-input appearance-none cursor-pointer"
-                data-testid="product-type-select"
+                data-testid="product-category-select"
                 {...register("category", { required: true })}
               >
                 {PRODUCT_TYPES.map((p) => (
