@@ -21,44 +21,66 @@ export default function Discover() {
 
   useEffect(() => {
     let cancelled = false;
+
+    const withTimeout = (p, ms = 8000) =>
+      Promise.race([
+        Promise.resolve(p),
+        new Promise((resolve) =>
+          setTimeout(
+            () => resolve({ error: { message: "Tiempo de espera agotado." }, data: null }),
+            ms
+          )
+        ),
+      ]);
+
     (async () => {
       setLoading(true);
       setError(null);
-      const { data: sList, error: sErr } = await supabase
-        .from("salons")
-        .select("id, name, slug, logo_url, primary_color, secondary_color, updated_at")
-        .eq("is_active", true)
-        .order("created_at", { ascending: false });
+      try {
+        const sRes = await withTimeout(
+          supabase
+            .from("salons")
+            .select("id, name, slug, logo_url, primary_color, secondary_color, updated_at")
+            .eq("is_active", true)
+            .order("created_at", { ascending: false })
+        );
 
-      if (cancelled) return;
-      if (sErr) {
-        setError(sErr.message);
-        setLoading(false);
-        return;
-      }
-      setSalons(sList || []);
-
-      if (sList && sList.length) {
-        const ids = sList.map((s) => s.id);
-        const { data: svc } = await supabase
-          .from("services")
-          .select("salon_id, category")
-          .in("salon_id", ids)
-          .eq("is_active", true);
         if (cancelled) return;
-        const map = {};
-        (svc || []).forEach((row) => {
-          if (!row.category) return;
-          map[row.salon_id] = map[row.salon_id] || new Set();
-          map[row.salon_id].add(row.category);
-        });
-        const reduced = {};
-        Object.entries(map).forEach(([k, set]) => {
-          reduced[k] = Array.from(set).slice(0, 3);
-        });
-        setCatsBySalon(reduced);
+        if (sRes?.error) {
+          setError(sRes.error.message);
+          setSalons([]);
+          return;
+        }
+        const sList = sRes?.data || [];
+        setSalons(sList);
+
+        if (sList.length) {
+          const ids = sList.map((s) => s.id);
+          const svcRes = await withTimeout(
+            supabase
+              .from("services")
+              .select("salon_id, category")
+              .in("salon_id", ids)
+              .eq("is_active", true)
+          );
+          if (cancelled) return;
+          const map = {};
+          (svcRes?.data || []).forEach((row) => {
+            if (!row.category) return;
+            map[row.salon_id] = map[row.salon_id] || new Set();
+            map[row.salon_id].add(row.category);
+          });
+          const reduced = {};
+          Object.entries(map).forEach(([k, set]) => {
+            reduced[k] = Array.from(set).slice(0, 3);
+          });
+          setCatsBySalon(reduced);
+        }
+      } catch (e) {
+        if (!cancelled) setError(e.message || "Error cargando salones.");
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      setLoading(false);
     })();
     return () => {
       cancelled = true;

@@ -28,46 +28,73 @@ export default function PublicSalon() {
 
   useEffect(() => {
     let cancelled = false;
+
+    const withTimeout = (p, ms = 8000) =>
+      Promise.race([
+        Promise.resolve(p),
+        new Promise((resolve) =>
+          setTimeout(
+            () => resolve({ error: { message: "timeout" }, data: null }),
+            ms
+          )
+        ),
+      ]);
+
     (async () => {
       setLoading(true);
       setNotFound(false);
-      const { data: s } = await supabase
-        .from("salons")
-        .select(
-          "id, name, slug, logo_url, primary_color, secondary_color, whatsapp_number, roomie_personality, updated_at"
-        )
-        .eq("slug", slug)
-        .eq("is_active", true)
-        .maybeSingle();
+      try {
+        const sRes = await withTimeout(
+          supabase
+            .from("salons")
+            .select(
+              "id, name, slug, logo_url, primary_color, secondary_color, whatsapp_number, roomie_personality, updated_at"
+            )
+            .eq("slug", slug)
+            .eq("is_active", true)
+            .maybeSingle()
+        );
 
-      if (cancelled) return;
-      if (!s) {
-        setNotFound(true);
-        setLoading(false);
-        return;
+        if (cancelled) return;
+        const s = sRes?.data;
+        if (!s) {
+          setNotFound(true);
+          return;
+        }
+        setSalon(s);
+
+        const [svcRes, prdRes] = await Promise.allSettled([
+          withTimeout(
+            supabase
+              .from("services")
+              .select(
+                "id, name, description, category, duration_minutes, price_cents, currency, image_url"
+              )
+              .eq("salon_id", s.id)
+              .eq("is_active", true)
+              .order("created_at", { ascending: false })
+              .limit(6)
+          ),
+          withTimeout(
+            supabase
+              .from("products")
+              .select(
+                "id, name, brand, description, price_cents, currency, image_url"
+              )
+              .eq("salon_id", s.id)
+              .eq("is_active", true)
+              .order("created_at", { ascending: false })
+              .limit(6)
+          ),
+        ]);
+        if (cancelled) return;
+        setServices(svcRes.status === "fulfilled" ? svcRes.value?.data || [] : []);
+        setProducts(prdRes.status === "fulfilled" ? prdRes.value?.data || [] : []);
+      } catch (e) {
+        if (!cancelled) setNotFound(true);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      setSalon(s);
-
-      const [svcRes, prdRes] = await Promise.all([
-        supabase
-          .from("services")
-          .select("id, name, description, category, duration_minutes, price_cents, currency, image_url")
-          .eq("salon_id", s.id)
-          .eq("is_active", true)
-          .order("created_at", { ascending: false })
-          .limit(6),
-        supabase
-          .from("products")
-          .select("id, name, brand, description, price_cents, currency, image_url")
-          .eq("salon_id", s.id)
-          .eq("is_active", true)
-          .order("created_at", { ascending: false })
-          .limit(6),
-      ]);
-      if (cancelled) return;
-      setServices(svcRes.data || []);
-      setProducts(prdRes.data || []);
-      setLoading(false);
     })();
     return () => {
       cancelled = true;
@@ -123,9 +150,9 @@ export default function PublicSalon() {
   return (
     <div className="min-h-screen rm-bg-aurora" data-testid="public-salon-page">
       <header className="max-w-5xl mx-auto px-4 md:px-8 pt-6 flex items-center justify-between">
-        <Link to="/" data-testid="public-salon-home-link">
-          <Logo size="sm" />
-        </Link>
+        <span data-testid="public-salon-home-link">
+          <Logo size="sm" to="/" />
+        </span>
         <Link
           to="/app/discover"
           className="rm-chip hover:bg-white/80"

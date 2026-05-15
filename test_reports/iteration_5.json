@@ -1,0 +1,54 @@
+{
+  "summary": "Iter 5 — RETEST of Discover/PublicSalon authed hang after withTimeout(8s) + try/finally fix landed. RESULT: the SKELETON-FOREVER bug is mitigated (loading state now resolves and sets either error/notfound or success), BUT the original underlying RLS hang on Supabase `salons` SELECT for the authenticated salon_owner is STILL THERE — the 8s timeout fires every time and the user lands on the failure branch. So functionally the authed view of Discover / PublicSalon is STILL UNUSABLE for salon_owners. Detailed pass/fail vs the requested cases: (#1) /app/discover authed → FAIL: at 8.0s the withTimeout race resolves to {error:'Tiempo de espera agotado.', data:null}, the page renders [data-testid='discover-error']='Tiempo de espera agotado.' + [data-testid='discover-empty'] (since salons=[]). The expected [data-testid='discover-grid'] with [data-testid='discover-card-aurora-qa-pahebpcu'] is NOT visible. So discover-loading is no longer infinite (good), but the data never loads (still bad). (#2) /discover/aurora-qa-pahebpcu authed → FAIL: the salons.maybeSingle() race times out at 8s with {data:null}, the code then hits `if(!s) setNotFound(true)` → page shows [data-testid='public-salon-notfound'] 'Salón no encontrado'. The owner cannot view their own public salon while logged in. Expected: [data-testid='public-salon-page'] + name. (#3) /discover/aurora-qa-pahebpcu ANON (cleared cookies+storage) → PASS: [data-testid='public-salon-page'] renders in 0.5 s with public-salon-name='Aurora QA pahebpcu', public-salon-monogram, public-salon-services-empty, public-salon-products-empty. (#4) Nested-anchor warning → PASS: 0 'validateDOMNesting <a> cannot appear as a descendant of <a>' messages on /discover/aurora-qa-pahebpcu authed and anon loads. The Logo-in-span change worked. (#5) AI Logo modal deferred flow → SKIPPED: did not exercise because the same authed-supabase-stall blocks the broader feature; AILogoModal is canvas-mock-by-design per agent_to_agent_context_note. Recommend re-attempting once #1/#2 unblock so the after-submit redirect to /salon doesn't itself hang.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "Supabase RLS on public.salons (SELECT for role=authenticated / salon_owner)",
+        "issue": "Authenticated salon_owner session: `select id,name,slug,... from salons where is_active=true [and slug=?]` never returns within 8 s (both the list query in Discover and the single-row maybeSingle in PublicSalon hang). Anon role on the same query returns in <0.5 s. Strongly suggests the RLS policy for authenticated users on `salons` is doing a join/check (likely through profiles.salon_id or a current_salon_id() function) that stalls or evaluates a recursive policy. Fix at the policy level: add `create policy salons_public_read on salons for select using (is_active = true)` (or similar permissive read for any role) and ensure no policy uses a function that itself queries salons/profiles recursively.",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Authed salon_owner browsing /app/discover",
+        "issue": "Timeout protection now correctly surfaces discover-error='Tiempo de espera agotado.' instead of an infinite skeleton, but the user still sees an empty Discover. Until the RLS issue is fixed, consider also: (a) on timeout, retrying once with a no-RLS-impacting columns subset, or (b) calling a SECURITY DEFINER RPC like list_public_salons() that bypasses the broken policy.",
+        "affected_selectors": ["[data-testid='discover-error']", "[data-testid='discover-empty']", "[data-testid='discover-grid']"]
+      },
+      {
+        "flow": "Authed salon_owner viewing own public salon page",
+        "issue": "On timeout the code can't distinguish 'truly not found' from 'RLS timeout' — both go to setNotFound(true). The owner sees 'Salón no encontrado' for their own salon. Suggest: on timeout, set a distinct state (e.g. setError('timeout')) and render a friendlier 'no se pudo cargar, reintenta' card, OR fetch the salon via a security-definer RPC get_public_salon_by_slug(slug).",
+        "affected_selectors": ["[data-testid='public-salon-notfound']", "[data-testid='public-salon-page']"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_5.json"],
+  "action_items": [
+    "ROOT CAUSE FIX (HIGH PRIORITY): Inspect and fix the RLS policy on public.salons for the authenticated role. The current policy stalls SELECTs for salon_owner sessions. Recommended migration: drop any role-scoped/recursive SELECT policy and add `create policy salons_public_read on public.salons for select to anon, authenticated using (is_active = true);`. Verify by logging in as test_salon_pahebpcu@roomie.test and running the same select in Supabase SQL editor — it currently hangs.",
+    "Alternative if RLS can't be loosened: expose a SECURITY DEFINER RPC `list_public_salons()` returning the same columns and call it from Discover.jsx / PublicSalon.jsx. This bypasses the policy and is fast for any role.",
+    "After the data-layer fix lands, retest #1 and #2 — expect [data-testid='discover-grid'] with the aurora-qa-pahebpcu card within 5 s while logged in, and [data-testid='public-salon-page'] on /discover/aurora-qa-pahebpcu while logged in.",
+    "On PublicSalon timeout, distinguish 'timeout' from 'notfound' (so owners don't see a misleading 'Salón no encontrado').",
+    "Smoke-test the AI Logo modal (#5) once authed Discover unblocks — currently deferred."
+  ],
+  "critical_code_review_comments": [
+    "Discover.jsx and PublicSalon.jsx now correctly use Promise.race against an 8 s timeout and a try/finally — the UI no longer hangs. Good fix.",
+    "However, the timeout merely masks a Supabase RLS / policy stall on `salons`. Until the policy is fixed, the authed user experience is broken: Discover is always empty + error toast, and the owner's own salon page renders 'Salón no encontrado'. A frontend timeout is a safety net, not the cure.",
+    "PublicSalon.jsx conflates 'timeout' with 'not found' (both end at setNotFound(true)). For owners that's confusing UX. Split the states.",
+    "Logo-in-span fix in PublicSalon header is clean — DOM nesting warning is gone."
+  ],
+  "updated_files": ["/app/test_reports/iteration_5.json"],
+  "success_rate": {
+    "backend": "skipped (frontend-only request, but Supabase RLS is the root cause)",
+    "frontend": "2/4 retest cases PASS: #3 anon PublicSalon, #4 no nested-<a> warning. 2/4 FAIL: #1 authed Discover shows discover-error+empty instead of grid+card, #2 authed PublicSalon shows public-salon-notfound instead of public-salon-page. #5 AI logo not exercised."
+  },
+  "test_credentials": "Existing: test_salon_pahebpcu@roomie.test / Roomie2026! (salon_owner, salon aurora-qa-pahebpcu).",
+  "seed_data_creation": "No new seed.",
+  "retest_needed": true,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "The hard 8 s timeout is verified working (no infinite skeleton). What remains is a Supabase data-layer fix: RLS on public.salons stalls for the authenticated role. Until the main agent ships a Supabase migration (permissive SELECT policy on salons.is_active=true for both anon and authenticated, or a SECURITY DEFINER RPC), the authed Discover/PublicSalon pages will keep falling into the error/notfound branches. After the fix: (1) login as test_salon_pahebpcu@roomie.test, hit /app/discover, expect [data-testid='discover-grid'] + [data-testid='discover-card-aurora-qa-pahebpcu'] in <5 s; (2) visit /discover/aurora-qa-pahebpcu authed, expect [data-testid='public-salon-page'] with name 'Aurora QA pahebpcu'. Also revisit #2 to ensure timeout-vs-notfound is disambiguated in UX. #5 AI logo modal still needs a smoke pass.",
+  "rca of the issue": "Discover and PublicSalon fixes in iter 4→5 added Promise.race against an 8 s timeout and try/finally — those resolved the 'forever-skeleton' symptom. But the underlying cause is server-side: Supabase RLS on `public.salons` SELECT path stalls for the authenticated role (verified: anon query <0.5 s; same query as salon_owner JWT times out at 8 s every time, on both list and maybeSingle by slug). Likely the policy uses current_salon_id() or joins profiles in a way that recursively triggers the same policy or hits an unindexed scan. Mitigation options: (a) replace the role-scoped SELECT policy with `for select to anon, authenticated using (is_active = true)`; (b) add a SECURITY DEFINER RPC list_public_salons() / get_public_salon_by_slug(slug) and call those instead of the raw table from the client; (c) at minimum, on the FE, split the timeout error from the not-found state so owners don't see a misleading 'Salón no encontrado'."
+}
