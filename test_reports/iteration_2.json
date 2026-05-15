@@ -1,0 +1,61 @@
+{
+  "summary": "Iteration 2 — Fase 4 (Core Business Layer + Salon Creation + AI Visual Hooks). Tested via Playwright against the live Supabase-backed app. Signup → onboarding → create-salon → salon-overview flow works end-to-end. AI Logo Modal opens with all 4 styles (minimal/glam/natural/luxury) and 6 palettes (magenta/azure/sage/nude/noir/rose) plus generate/cancel/close buttons. Auto-slug generation works. SalonOnboardingGate correctly routes salon_owner without salon_id to /onboarding/salon. Mobile (390) has no horizontal overflow on /salon nor /app/vision. CRITICAL BUG: after a hard navigation (page reload) to any authed sub-route (/salon/services, /salon/products, /app/vision) the FullScreenLoader ([data-testid='app-loading']) NEVER disappears within 10-20 s — i.e. AuthContext.loading stays true and the 12-s failsafe described in the spec does not appear to be firing reliably after rehydration. Because the loader is permanent, ProtectedRoute never gets to evaluate role → a client account can therefore *appear* to sit on /salon/services without being redirected to /unauthorized (URL stays put while the spinner is on screen).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "AuthContext / FullScreenLoader",
+        "issue": "After hard-reload navigation (page.goto) to /salon/services, /salon/products or /app/vision the FullScreenLoader stays on screen indefinitely (>20s). The 12-s failsafe documented for AuthContext does not appear to release `loading` on rehydration. The salon-overview path works on first redirect after onboarding (in-app SPA navigation), but reloads of /salon/* sub-routes get stuck.",
+        "selector": "[data-testid='app-loading']",
+        "priority": "CRITICAL"
+      },
+      {
+        "component": "ProtectedRoute (consequence of loader bug)",
+        "issue": "A client account that navigates directly to /salon/services stays on /salon/services (URL never redirects to /unauthorized) because the app is stuck in FullScreenLoader; ProtectedRoute can only run after loading=false. Once the loader bug is fixed this should be re-verified.",
+        "selector": "/salon/services",
+        "priority": "HIGH"
+      },
+      {
+        "component": "BottomNav / TopBar (mobile)",
+        "issue": "No data-testid attributes detected on mobile bottom nav or top bar (searched for testids containing 'bottom', 'nav', 'top'). Spec asks for 5 client + 6 salon nav items to be present and testable. Add data-testid='bottom-nav', 'bottom-nav-{key}', 'top-bar' to enable the spec's nav coverage.",
+        "selector": "nav, [data-testid='bottom-nav']",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Service CRUD / Product CRUD / Vision upload",
+        "issue": "Could not exercise CRUD or selfie upload because /salon/services, /salon/products and /app/vision never render their page testids — they remain at [data-testid='app-loading']. Once the loader bug is fixed these flows need to be retested end-to-end (create service, edit, toggle is_active, delete; create product with category/recommended_for; selfie upload → processing → result).",
+        "affected_selectors": ["[data-testid='services-page']", "[data-testid='products-page']", "[data-testid='vision-upload-btn']"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_2.json"],
+  "action_items": [
+    "FIX (highest priority): investigate why AuthContext.loading does not resolve within 12 s after a hard reload of /salon/services, /salon/products or /app/vision. Possible causes: (a) `getSession()` + `getProfile()` chain awaits forever when called on a deep-link route, (b) the documented 12-s failsafe is gated on a flag that is reset on every effect run, (c) profile fetch hangs because RLS denies and the supabase client retries silently. Add a hard timeout (setTimeout(() => setLoading(false), 12000)) at mount and confirm it always fires.",
+    "Add data-testid='bottom-nav', 'bottom-nav-{key}', 'top-bar' on the mobile shell so the 5/6 nav-item coverage from the spec is testable.",
+    "After loader fix, re-run /salon/services CRUD, /salon/products CRUD (note: products.category + recommended_for columns require migration 0003 to be applied — if not applied yet, the friendly Spanish error path needs verification) and /app/vision selfie upload → processing → mocked result.",
+    "Re-verify ProtectedRoute → /unauthorized redirect for client→/salon/* once loader resolves."
+  ],
+  "critical_code_review_comments": [
+    "AuthContext failsafe: the 12-s timeout to force loading=false must run on every effect that toggles loading, not only on initial mount. After page reload to a deep-link route, if getSession() never resolves the user is trapped forever in FullScreenLoader.",
+    "OnboardingSalon submit → navigate('/salon', { replace:true }) works because it is an SPA transition (no reload). But any subsequent F5 / direct URL hit on /salon/* triggers the bug. This is the same root cause as the client-block regression.",
+    "Mobile nav components miss data-testid — add them to be in line with the rest of the codebase which already tags interactive elements.",
+    "Spec calls for friendly Spanish error when products.category column or storage buckets are missing (migration 0003 not yet applied). Could not validate because /salon/products is stuck behind FullScreenLoader; needs re-test after loader fix to confirm the error surfaces via [data-testid='products-error']."
+  ],
+  "updated_files": ["/app/test_reports/iteration_2.json"],
+  "success_rate": {
+    "backend": "skipped (frontend-only request)",
+    "frontend": "8/13 verified PASS (signup salon_owner, onboarding elements, auto-slug, AI logo modal opens, create salon without logo, salon overview render, mobile no-overflow on /salon, mobile no-overflow on /app/vision, SalonOnboardingGate). 5 BLOCKED by the FullScreenLoader bug on hard-nav (services CRUD, products CRUD, vision upload, client→/salon block, mobile bottom-nav coverage)."
+  },
+  "test_credentials": "Fresh signups created in Supabase: test_salon_<rand>@roomie.test / Roomie2026! (salon_owner) and test_client_<rand>@roomie.test / Roomie2026! (client). Confirm-email is OFF so sessions are immediate.",
+  "seed_data_creation": "Two fresh Supabase auth users and one salon row ('Aurora Beauty Lab QA' / slug 'aurora-beauty-lab-qa') were created via the real signup + create_my_salon RPC. No backend seed touched (FastAPI only exposes /api/health).",
+  "retest_needed": true,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "Onboarding + AI Logo Modal + create-salon path is solid. The blocker is AuthContext rehydration on deep-link reloads — once that is fixed, re-run: (1) /salon/services full CRUD (create with category 'nails', toggle, edit pre-fill, delete), (2) /salon/products create with recommended_for comma-split (this will fail with friendly ES error if migration 0003 not applied — verify the [data-testid='products-error'] copy reads as Spanish), (3) /app/vision selfie upload → step 'processing' → step 'result' with mocked proposal, (4) /salon/services with a client account → expect redirect to /unauthorized, (5) mobile 5 client + 6 salon bottom-nav items (need data-testid added by E1 first). AI Logo Modal real-upload to Storage is gated on migration 0003 buckets being created — if not, expect a friendly Spanish error inside the modal, not a crash.",
+  "rca of the issue": "Symptom: navigating directly (page reload) to /salon/services, /salon/products or /app/vision shows the FullScreenLoader spinner indefinitely (>20s); same routes load instantly when reached via in-app SPA navigation from /salon. Reproduction: signup salon_owner → onboarding → /salon (works) → page.goto('/salon/services') → spinner forever. Likely cause: AuthContext does an async getSession()+getProfile() chain on mount and `loading` is gated on completion. The 12-s failsafe described in the spec is either missing in the effect cleanup path or guarded by a stale closure. Mitigation: add an unconditional `setTimeout(() => setLoading(false), 12000)` registered once at mount, cleared if the chain resolves earlier — ensures the loader can never trap the user."
+}

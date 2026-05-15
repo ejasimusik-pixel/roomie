@@ -7,13 +7,16 @@ import {
   ArrowRight,
   Store,
   Link as LinkIcon,
-  Image as ImageIcon,
   MessageCircle,
+  Wand2,
 } from "lucide-react";
 import Logo from "../../components/Logo";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../lib/supabase";
 import { mapSupabaseError } from "../../lib/errors";
+import ImageUploader from "../../components/ImageUploader";
+import AILogoModal from "../../components/AILogoModal";
+import { BUCKETS } from "../../lib/storage";
 
 const COLOR_PRESETS = [
   { name: "Magenta", primary: "#E040A0", secondary: "#7C52AA" },
@@ -67,6 +70,8 @@ export default function OnboardingSalon() {
 
   const [serverError, setServerError] = useState(null);
   const [slugTouched, setSlugTouched] = useState(false);
+  const [logo, setLogo] = useState({ url: "", path: null });
+  const [aiOpen, setAiOpen] = useState(false);
 
   const nameValue = watch("name");
   const primary = watch("primary_color");
@@ -103,7 +108,7 @@ export default function OnboardingSalon() {
       p_slug: slugify(values.slug || values.name),
       p_primary_color: values.primary_color,
       p_secondary_color: values.secondary_color,
-      p_logo_url: values.logo_url?.trim() || null,
+      p_logo_url: logo.url || null,
       p_whatsapp_number: values.whatsapp_number?.trim() || null,
       p_roomie_personality: roomie_personality,
     });
@@ -222,23 +227,6 @@ export default function OnboardingSalon() {
               </div>
 
               <div>
-                <label className="rm-label">Logo (URL, opcional)</label>
-                <div className="relative">
-                  <ImageIcon
-                    size={16}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 text-violet-300"
-                  />
-                  <input
-                    type="url"
-                    placeholder="https://…"
-                    data-testid="onboarding-logo-input"
-                    className="rm-input pl-11"
-                    {...register("logo_url")}
-                  />
-                </div>
-              </div>
-
-              <div>
                 <label className="rm-label">WhatsApp (opcional)</label>
                 <div className="relative">
                   <MessageCircle
@@ -254,6 +242,31 @@ export default function OnboardingSalon() {
                   />
                 </div>
               </div>
+
+              <div>
+                {/* Reserved for future identity options (Instagram, etc.) */}
+              </div>
+            </div>
+
+            <div className="mt-6 grid sm:grid-cols-[1fr_auto] gap-3 items-end">
+              <ImageUploader
+                bucket={BUCKETS.SALON_LOGOS}
+                scopeId={profile?.id || "draft"}
+                value={logo.url}
+                onUploaded={({ url, path }) => setLogo({ url, path })}
+                onClear={() => setLogo({ url: "", path: null })}
+                label="Logo del salón (opcional)"
+                aspect="square"
+                testId="onboarding-logo-uploader"
+              />
+              <button
+                type="button"
+                onClick={() => setAiOpen(true)}
+                className="rm-btn-ghost mb-0 self-stretch sm:self-end whitespace-nowrap"
+                data-testid="onboarding-ai-logo-btn"
+              >
+                <Wand2 size={16} /> Crear logo con IA
+              </button>
             </div>
           </section>
 
@@ -425,6 +438,14 @@ export default function OnboardingSalon() {
           </div>
         </form>
       </div>
+
+      <AILogoModal
+        open={aiOpen}
+        onClose={() => setAiOpen(false)}
+        initialName={watch("name")}
+        scopeId={profile?.id || "draft"}
+        onGenerated={({ url, path }) => setLogo({ url, path })}
+      />
     </div>
   );
 }

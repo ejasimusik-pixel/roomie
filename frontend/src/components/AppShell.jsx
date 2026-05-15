@@ -8,10 +8,12 @@ import {
   CalendarRange,
   Users,
   Scissors,
+  Package,
   UserCog,
   ShieldCheck,
   Building2,
   Activity,
+  Wand2,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import Sidebar from "./Sidebar";
@@ -32,6 +34,7 @@ export default function AppShell({ role, title }) {
   const clientItems = [
     { to: "/app", label: t("nav.home"), icon: Home },
     { to: "/app/discover", label: t("nav.discover"), icon: Sparkles },
+    { to: "/app/vision", label: "Vision", icon: Wand2 },
     { to: "/app/bookings", label: t("nav.bookings"), icon: CalendarHeart },
     { to: "/app/profile", label: t("nav.profile"), icon: User },
   ];
@@ -39,8 +42,9 @@ export default function AppShell({ role, title }) {
   const salonItems = [
     { to: "/salon", label: t("nav.overview"), icon: LayoutDashboard },
     { to: "/salon/agenda", label: t("nav.agenda"), icon: CalendarRange },
-    { to: "/salon/clients", label: t("nav.clients"), icon: Users },
     { to: "/salon/services", label: t("nav.services"), icon: Scissors },
+    { to: "/salon/products", label: "Productos", icon: Package },
+    { to: "/salon/clients", label: t("nav.clients"), icon: Users },
     { to: "/salon/team", label: t("nav.team"), icon: UserCog },
   ];
 

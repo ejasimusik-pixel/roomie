@@ -1,127 +1,262 @@
-import { useTranslation } from "react-i18next";
-import { CalendarRange, Wallet, UsersRound, Activity } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import {
+  CalendarRange,
+  Scissors,
+  Package,
+  Plus,
+  Sparkles,
+} from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { supabase } from "../../lib/supabase";
+import { mapSupabaseError } from "../../lib/errors";
 import StatCard from "../../components/StatCard";
 import GlassCard from "../../components/GlassCard";
+import EmptyState from "../../components/EmptyState";
+import Skeleton from "../../components/Skeleton";
 
 export default function SalonOverview() {
-  const { t } = useTranslation();
-  const { profile } = useAuth();
+  const { profile, salonId } = useAuth();
+  const [stats, setStats] = useState({
+    services: 0,
+    products: 0,
+    appointments: 0,
+  });
+  const [salon, setSalon] = useState(null);
+  const [upcoming, setUpcoming] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const stats = [
-    {
-      icon: CalendarRange,
-      label: t("salon.todayBookings"),
-      value: "12",
-      hint: "+3 vs ayer",
-      accent: "from-magenta-500 to-pink-300",
-      testId: "salon-stat-bookings",
-    },
-    {
-      icon: Wallet,
-      label: t("salon.revenue"),
-      value: "$48.2k",
-      hint: "+18% MoM",
-      accent: "from-sky-400 to-violet-500",
-      testId: "salon-stat-revenue",
-    },
-    {
-      icon: UsersRound,
-      label: t("salon.newClients"),
-      value: "27",
-      hint: "este mes",
-      accent: "from-violet-500 to-magenta-500",
-      testId: "salon-stat-clients",
-    },
-    {
-      icon: Activity,
-      label: t("salon.occupancy"),
-      value: "82%",
-      hint: "promedio semanal",
-      accent: "from-sky-400 to-magenta-500",
-      testId: "salon-stat-occupancy",
-    },
-  ];
+  const refresh = useCallback(async () => {
+    if (!salonId) return;
+    setLoading(true);
+    setError(null);
+
+    const now = new Date().toISOString();
+    const [svcRes, prdRes, apRes, sRes] = await Promise.all([
+      supabase
+        .from("services")
+        .select("id", { count: "exact", head: true })
+        .eq("salon_id", salonId)
+        .eq("is_active", true),
+      supabase
+        .from("products")
+        .select("id", { count: "exact", head: true })
+        .eq("salon_id", salonId)
+        .eq("is_active", true),
+      supabase
+        .from("appointments")
+        .select(
+          "id, starts_at, ends_at, status, notes, services(name, duration_minutes), profiles:client_id(full_name)"
+        )
+        .eq("salon_id", salonId)
+        .gte("starts_at", now)
+        .order("starts_at", { ascending: true })
+        .limit(5),
+      supabase.from("salons").select("*").eq("id", salonId).maybeSingle(),
+    ]);
+
+    const firstError =
+      svcRes.error || prdRes.error || apRes.error || sRes.error;
+    if (firstError) {
+      setError(mapSupabaseError(firstError));
+    }
+
+    setStats({
+      services: svcRes.count ?? 0,
+      products: prdRes.count ?? 0,
+      appointments: apRes.data?.length ?? 0,
+    });
+    setUpcoming(apRes.data || []);
+    setSalon(sRes.data || null);
+    setLoading(false);
+  }, [salonId]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  const firstName = profile?.full_name?.split(" ")[0] || "Tu salón";
 
   return (
     <div className="space-y-6 animate-fade-in" data-testid="salon-overview">
-      <header className="space-y-1.5">
-        <div className="flex items-center gap-2 flex-wrap">
+      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="min-w-0">
           <p className="text-sm font-semibold text-violet-400 uppercase tracking-widest">
-            {t("salon.workspace")}
+            Workspace
           </p>
-          <span className="rm-chip" data-testid="salon-preview-chip">
-            Vista previa
-          </span>
+          <h1 className="font-display font-extrabold text-3xl md:text-4xl text-violet-900 tracking-tight break-words">
+            {salon?.name || firstName} ·{" "}
+            <span className="rm-text-gradient">Hoy</span>
+          </h1>
+          {salon?.slug && (
+            <p className="text-violet-400 text-sm mt-0.5">
+              roomie.app/{salon.slug}
+            </p>
+          )}
         </div>
-        <h1 className="font-display font-extrabold text-3xl md:text-4xl text-violet-900 tracking-tight break-words">
-          {profile?.full_name?.split(" ")[0] || "Tu salón"} ·{" "}
-          <span className="rm-text-gradient">{t("salon.today")}</span>
-        </h1>
-        <p className="text-violet-500 text-sm">
-          Métricas de muestra. Se conectarán a tu agenda real en la próxima fase.
-        </p>
+        {salon?.logo_url && (
+          <img
+            src={salon.logo_url}
+            alt={salon.name}
+            className="w-14 h-14 rounded-2xl object-cover shadow-soft self-start sm:self-auto"
+          />
+        )}
       </header>
 
-      <section className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((s) => (
-          <StatCard key={s.label} {...s} />
-        ))}
-      </section>
+      {error && (
+        <div
+          className="rounded-2xl bg-magenta-500/10 border border-magenta-500/20 p-3 text-sm text-magenta-600"
+          data-testid="overview-error"
+        >
+          {error}
+        </div>
+      )}
 
-      <section className="grid lg:grid-cols-3 gap-4">
-        <GlassCard className="lg:col-span-2" testId="salon-upcoming">
-          <h2 className="font-display font-bold text-xl text-violet-900 mb-4">
-            {t("salon.upcoming")}
+      {/* KPIs */}
+      {loading ? (
+        <div className="grid sm:grid-cols-3 gap-4" data-testid="overview-loading">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} variant="card" />
+          ))}
+        </div>
+      ) : (
+        <section className="grid sm:grid-cols-3 gap-4">
+          <StatCard
+            icon={Scissors}
+            label="Servicios activos"
+            value={stats.services}
+            hint="catálogo público"
+            accent="from-magenta-500 to-pink-300"
+            testId="kpi-services"
+          />
+          <StatCard
+            icon={Package}
+            label="Productos activos"
+            value={stats.products}
+            hint="recomendaciones"
+            accent="from-sky-400 to-violet-500"
+            testId="kpi-products"
+          />
+          <StatCard
+            icon={CalendarRange}
+            label="Próximas citas"
+            value={stats.appointments}
+            hint="los próximos días"
+            accent="from-violet-500 to-magenta-500"
+            testId="kpi-appointments"
+          />
+        </section>
+      )}
+
+      {/* Upcoming */}
+      <GlassCard testId="salon-upcoming" hoverable={false}>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-display font-bold text-xl text-violet-900">
+            Próximas citas
           </h2>
-          <ul className="space-y-3">
-            {[
-              { t: "09:30", c: "Sofía M.", s: "Balayage", d: "120 min" },
-              { t: "11:00", c: "Camila R.", s: "Manicura premium", d: "60 min" },
-              { t: "13:30", c: "Valeria T.", s: "Facial luxe", d: "90 min" },
-              { t: "16:00", c: "Andrea P.", s: "Brow lamination", d: "45 min" },
-            ].map((row) => (
-              <li
-                key={row.t}
-                className="flex items-center gap-3 sm:gap-4 p-3 rounded-2xl bg-white/40 hover:bg-white/70 transition-colors"
-              >
-                <div className="w-12 sm:w-14 text-center flex-shrink-0">
-                  <p className="text-sm font-bold text-violet-900">{row.t}</p>
-                  <p className="text-[10px] uppercase tracking-widest text-violet-400">
-                    Hoy
-                  </p>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-violet-900 truncate">{row.c}</p>
-                  <p className="text-sm text-violet-500 truncate">{row.s}</p>
-                </div>
-                <span className="rm-chip hidden sm:inline-flex flex-shrink-0">
-                  {row.d}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </GlassCard>
+        </div>
 
-        <GlassCard testId="salon-quick-actions">
-          <h3 className="font-display font-bold text-lg text-violet-900 mb-3">
-            Atajos
-          </h3>
-          <div className="space-y-2.5">
-            {[
-              t("salon.manageServices"),
-              t("salon.manageTeam"),
-              t("nav.clients"),
-            ].map((label) => (
-              <button
-                key={label}
-                className="w-full text-left px-4 py-3 rounded-2xl bg-white/50 hover:bg-white/80 text-sm font-semibold text-violet-700 transition-colors"
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </GlassCard>
+        {loading ? (
+          <Skeleton count={3} className="space-y-3" />
+        ) : upcoming.length === 0 ? (
+          <EmptyState
+            icon={CalendarRange}
+            title="Sin citas próximas"
+            description="Cuando una clienta reserve, aparecerá aquí. Por ahora ve creando tu catálogo."
+            cta="Ir a Servicios"
+            onAction={() => (window.location.href = "/salon/services")}
+            testId="upcoming-empty"
+            className="!shadow-none !border-0 !bg-transparent"
+          />
+        ) : (
+          <ul className="space-y-3">
+            {upcoming.map((row) => {
+              const date = new Date(row.starts_at);
+              const time = date.toLocaleTimeString("es", {
+                hour: "2-digit",
+                minute: "2-digit",
+              });
+              const day = date.toLocaleDateString("es", {
+                weekday: "short",
+                day: "numeric",
+              });
+              return (
+                <li
+                  key={row.id}
+                  className="flex items-center gap-3 p-3 rounded-2xl bg-white/40 hover:bg-white/70 transition-colors"
+                  data-testid={`upcoming-row-${row.id}`}
+                >
+                  <div className="w-14 sm:w-16 text-center flex-shrink-0">
+                    <p className="text-sm font-bold text-violet-900">{time}</p>
+                    <p className="text-[10px] uppercase tracking-widest text-violet-400">
+                      {day}
+                    </p>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-violet-900 truncate">
+                      {row.profiles?.full_name || "Clienta"}
+                    </p>
+                    <p className="text-sm text-violet-500 truncate">
+                      {row.services?.name || "Cita"}
+                    </p>
+                  </div>
+                  <span className="rm-chip hidden sm:inline-flex flex-shrink-0 capitalize">
+                    {row.status}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </GlassCard>
+
+      {/* Quick actions */}
+      <section className="grid sm:grid-cols-3 gap-4">
+        <Link
+          to="/salon/services"
+          className="rm-glass rounded-3xl p-5 hover:shadow-glow transition-all hover:-translate-y-0.5"
+          data-testid="quick-services"
+        >
+          <Scissors size={18} className="text-magenta-500" />
+          <p className="mt-3 font-display font-bold text-violet-900">
+            Gestiona tus servicios
+          </p>
+          <p className="text-sm text-violet-500 mt-1">
+            Crea, edita y publica rituales premium.
+          </p>
+          <span className="inline-flex items-center gap-1 mt-3 text-sm font-semibold text-magenta-500">
+            <Plus size={14} /> Nuevo servicio
+          </span>
+        </Link>
+        <Link
+          to="/salon/products"
+          className="rm-glass rounded-3xl p-5 hover:shadow-glow transition-all hover:-translate-y-0.5"
+          data-testid="quick-products"
+        >
+          <Package size={18} className="text-violet-500" />
+          <p className="mt-3 font-display font-bold text-violet-900">
+            Gestiona tus productos
+          </p>
+          <p className="text-sm text-violet-500 mt-1">
+            Recomienda los productos que vendes.
+          </p>
+          <span className="inline-flex items-center gap-1 mt-3 text-sm font-semibold text-violet-500">
+            <Plus size={14} /> Nuevo producto
+          </span>
+        </Link>
+        <div
+          className="rm-glass rounded-3xl p-5 opacity-90"
+          data-testid="quick-vision"
+        >
+          <Sparkles size={18} className="text-sky-500" />
+          <p className="mt-3 font-display font-bold text-violet-900">
+            Roomie Vision (Beta)
+          </p>
+          <p className="text-sm text-violet-500 mt-1">
+            Próximamente: propuestas visuales generadas con IA para tus clientas.
+          </p>
+        </div>
       </section>
     </div>
   );

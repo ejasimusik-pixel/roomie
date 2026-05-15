@@ -12,7 +12,10 @@ import Unauthorized from "./pages/Unauthorized";
 import OnboardingSalon from "./pages/onboarding/OnboardingSalon";
 
 import ClientHome from "./pages/client/ClientHome";
+import Vision from "./pages/client/Vision";
 import SalonOverview from "./pages/salon/SalonOverview";
+import Services from "./pages/salon/Services";
+import Products from "./pages/salon/Products";
 import AdminOverview from "./pages/admin/AdminOverview";
 import Placeholder from "./pages/Placeholder";
 
@@ -62,6 +65,7 @@ export default function App() {
             />
           }
         />
+        <Route path="vision" element={<Vision />} />
         <Route
           path="bookings"
           element={
@@ -126,16 +130,8 @@ export default function App() {
             />
           }
         />
-        <Route
-          path="services"
-          element={
-            <Placeholder
-              titleKey="nav.services"
-              descKey="salon.workspace"
-              testId="salon-services"
-            />
-          }
-        />
+        <Route path="services" element={<Services />} />
+        <Route path="products" element={<Products />} />
         <Route
           path="team"
           element={
