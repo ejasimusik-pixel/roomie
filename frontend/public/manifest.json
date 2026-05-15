@@ -1,0 +1,20 @@
+{
+  "short_name": "Roomie",
+  "name": "Roomie — Personal Care & Wellbeing",
+  "description": "Plataforma premium de belleza impulsada por IA",
+  "icons": [
+    {
+      "src": "icons/emoji-roomie.jpg",
+      "sizes": "192x192 512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#E040A0",
+  "background_color": "#F8F4FF",
+  "lang": "es"
+}

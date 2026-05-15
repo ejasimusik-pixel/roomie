@@ -1,0 +1,55 @@
+{
+  "summary": "First-iteration full test of ROOMIE PWA architecture. Backend health endpoints (/api/, /api/health) verified via pytest (3/3 PASS). Frontend exercised end-to-end with Playwright covering landing, i18n, demo login/signup, role routing (client/salon_owner/admin), protected-route gating, unauthorized redirects, all 11 sub-routes, Google OAuth demo flow, logout from both sidebar (desktop) and topbar (mobile), and mobile responsive (390x844) bottom nav + menu drawer. All 33 functional checks pass.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "All pages (Landing, ClientHome, SalonOverview, AdminOverview)",
+        "issues": [
+          "React console warning: `Warning: React does not recognize the testId prop on a DOM element. ... spell it as lowercase testid instead.` Originates from the GlassCard component spreading a camelCased `testId` prop straight onto a <div>. Functional impact: none, but it pollutes the console on every glass card render. Fix: in components/GlassCard.jsx, accept `testId` and forward it as `data-testid={testId}` instead of spreading it, OR rename the prop to `testid`."
+        ]
+      },
+      {
+        "screen": "Console (global)",
+        "issues": [
+          "React Router future-flag warnings (v7_startTransition, v7_relativeSplatPath). Cosmetic only — can be silenced by passing the future flags to <BrowserRouter>."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_health.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Fix GlassCard prop forwarding so `testId` is rendered as `data-testid` (or filter the prop out of DOM spread) — eliminates a repeated React warning visible on every page.",
+    "Optional: opt-in to React Router v7 future flags to silence the two startup warnings."
+  ],
+  "critical_code_review_comments": [
+    "GlassCard leaks a non-standard camelCase `testId` attribute to the DOM (React warning on every render). Either rename to `data-testid` or whitelist allowed props before spreading.",
+    "Backend stub is intentionally minimal — fine as per spec. No DB layer needed.",
+    "supabase.js demo fallback is well-isolated and the seeded users + emitAuthChange contract correctly mirror real Supabase. Good design.",
+    "ProtectedRoute correctly gates by role and preserves intended target via location.state.from; works as expected.",
+    "Login.jsx redirect logic uses `location.state?.from` first which is correct for return-to-target after auth, and falls back to role-based default."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_health.py (new)",
+    "/app/test_reports/pytest/pytest_results.xml (new)",
+    "/app/test_reports/iteration_1.json (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (3/3)",
+    "frontend": "100% (33/33 functional checks across landing, i18n, login, signup, 3 role redirects, 2 cross-role blocks, 3 unauth redirects, 11 sub-route navigations, sidebar logout, topbar logout, Google OAuth demo, mobile bottom-nav, mobile menu button)"
+  },
+  "test_credentials": "cliente@roomie.demo / salon@roomie.demo / admin@roomie.demo — all password Roomie2026! (auto-seeded by /app/frontend/src/lib/supabase.js buildDemoClient on first load).",
+  "seed_data_creation": "None created on backend. Frontend localStorage demo users are auto-seeded by the app itself. Test-created users use TEST_ email prefix and live only in browser localStorage (cleared between flows).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All architecture checks for iteration 1 pass. The only remaining cleanup is the GlassCard `testId`->`data-testid` prop fix to remove the recurring React warning. Backend has no business endpoints by design — do not test data CRUD. When Supabase keys are wired into /app/frontend/.env, the demo banner (data-testid='demo-notice') will disappear and OAuth will redirect off-domain; tests for those should be adjusted accordingly.",
+  "rca of the issue": "N/A — no functional bugs found. Only a non-blocking React DOM-attribute warning caused by spreading a camelCase `testId` prop onto a <div> inside GlassCard."
+}

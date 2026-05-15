@@ -1,0 +1,182 @@
+import { Routes, Route, Navigate } from "react-router-dom";
+import { useAuth } from "./context/AuthContext";
+import ProtectedRoute from "./components/ProtectedRoute";
+import AppShell from "./components/AppShell";
+
+import Landing from "./pages/Landing";
+import Login from "./pages/auth/Login";
+import Signup from "./pages/auth/Signup";
+import AuthCallback from "./pages/auth/AuthCallback";
+import Unauthorized from "./pages/Unauthorized";
+
+import ClientHome from "./pages/client/ClientHome";
+import SalonOverview from "./pages/salon/SalonOverview";
+import AdminOverview from "./pages/admin/AdminOverview";
+import Placeholder from "./pages/Placeholder";
+
+function FullScreenLoader() {
+  return (
+    <div
+      className="min-h-screen flex items-center justify-center"
+      data-testid="app-loading"
+    >
+      <div className="rm-glass-strong rounded-3xl px-8 py-6">
+        <div className="w-8 h-8 rounded-full border-2 border-violet-200 border-t-magenta-500 animate-spin" />
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  const { loading } = useAuth();
+  if (loading) return <FullScreenLoader />;
+
+  return (
+    <Routes>
+      {/* Public */}
+      <Route path="/" element={<Landing />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/signup" element={<Signup />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
+      <Route path="/unauthorized" element={<Unauthorized />} />
+
+      {/* Client workspace */}
+      <Route
+        path="/app"
+        element={
+          <ProtectedRoute allowedRoles={["client", "salon_owner", "admin"]}>
+            <AppShell role="client" title="Roomie" />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<ClientHome />} />
+        <Route
+          path="discover"
+          element={
+            <Placeholder
+              titleKey="nav.discover"
+              descKey="client.subtitle"
+              testId="client-discover"
+            />
+          }
+        />
+        <Route
+          path="bookings"
+          element={
+            <Placeholder
+              titleKey="nav.bookings"
+              descKey="client.subtitle"
+              testId="client-bookings"
+            />
+          }
+        />
+        <Route
+          path="profile"
+          element={
+            <Placeholder
+              titleKey="nav.profile"
+              descKey="client.subtitle"
+              testId="client-profile"
+            />
+          }
+        />
+      </Route>
+
+      {/* Salon workspace */}
+      <Route
+        path="/salon"
+        element={
+          <ProtectedRoute allowedRoles={["salon_owner", "admin"]}>
+            <AppShell role="salon_owner" title="Workspace" />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<SalonOverview />} />
+        <Route
+          path="agenda"
+          element={
+            <Placeholder
+              titleKey="nav.agenda"
+              descKey="salon.workspace"
+              testId="salon-agenda"
+            />
+          }
+        />
+        <Route
+          path="clients"
+          element={
+            <Placeholder
+              titleKey="nav.clients"
+              descKey="salon.workspace"
+              testId="salon-clients"
+            />
+          }
+        />
+        <Route
+          path="services"
+          element={
+            <Placeholder
+              titleKey="nav.services"
+              descKey="salon.workspace"
+              testId="salon-services"
+            />
+          }
+        />
+        <Route
+          path="team"
+          element={
+            <Placeholder
+              titleKey="nav.team"
+              descKey="salon.workspace"
+              testId="salon-team"
+            />
+          }
+        />
+      </Route>
+
+      {/* Admin panel */}
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <AppShell role="admin" title="Admin" />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<AdminOverview />} />
+        <Route
+          path="salons"
+          element={
+            <Placeholder
+              titleKey="nav.salons"
+              descKey="admin.panel"
+              testId="admin-salons"
+            />
+          }
+        />
+        <Route
+          path="users"
+          element={
+            <Placeholder
+              titleKey="nav.users"
+              descKey="admin.panel"
+              testId="admin-users"
+            />
+          }
+        />
+        <Route
+          path="health"
+          element={
+            <Placeholder
+              titleKey="admin.platformHealth"
+              descKey="admin.panel"
+              testId="admin-health"
+            />
+          }
+        />
+      </Route>
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
