@@ -45,14 +45,22 @@ export default function SalonOverview() {
 
   return (
     <div className="space-y-6 animate-fade-in" data-testid="salon-overview">
-      <header>
-        <p className="text-sm font-semibold text-violet-400 uppercase tracking-widest">
-          {t("salon.workspace")}
-        </p>
-        <h1 className="font-display font-extrabold text-3xl md:text-4xl text-violet-900 tracking-tight">
+      <header className="space-y-1.5">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-sm font-semibold text-violet-400 uppercase tracking-widest">
+            {t("salon.workspace")}
+          </p>
+          <span className="rm-chip" data-testid="salon-preview-chip">
+            Vista previa
+          </span>
+        </div>
+        <h1 className="font-display font-extrabold text-3xl md:text-4xl text-violet-900 tracking-tight break-words">
           {profile?.full_name?.split(" ")[0] || "Tu salón"} ·{" "}
           <span className="rm-text-gradient">{t("salon.today")}</span>
         </h1>
+        <p className="text-violet-500 text-sm">
+          Métricas de muestra. Se conectarán a tu agenda real en la próxima fase.
+        </p>
       </header>
 
       <section className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -75,19 +83,21 @@ export default function SalonOverview() {
             ].map((row) => (
               <li
                 key={row.t}
-                className="flex items-center gap-4 p-3 rounded-2xl bg-white/40 hover:bg-white/70 transition-colors"
+                className="flex items-center gap-3 sm:gap-4 p-3 rounded-2xl bg-white/40 hover:bg-white/70 transition-colors"
               >
-                <div className="w-14 text-center">
+                <div className="w-12 sm:w-14 text-center flex-shrink-0">
                   <p className="text-sm font-bold text-violet-900">{row.t}</p>
                   <p className="text-[10px] uppercase tracking-widest text-violet-400">
                     Hoy
                   </p>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-violet-900">{row.c}</p>
+                  <p className="font-semibold text-violet-900 truncate">{row.c}</p>
                   <p className="text-sm text-violet-500 truncate">{row.s}</p>
                 </div>
-                <span className="rm-chip">{row.d}</span>
+                <span className="rm-chip hidden sm:inline-flex flex-shrink-0">
+                  {row.d}
+                </span>
               </li>
             ))}
           </ul>

@@ -190,9 +190,9 @@ export default function Landing() {
       </section>
 
       <footer className="px-4 md:px-8 pb-10">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-violet-400">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center md:items-center justify-between gap-3 text-sm text-violet-400 text-center md:text-left">
           <Logo size="sm" />
-          <p>© {new Date().getFullYear()} Roomie. {t("landing.footer")}</p>
+          <p className="leading-snug">© {new Date().getFullYear()} Roomie. {t("landing.footer")}</p>
         </div>
       </footer>
     </div>

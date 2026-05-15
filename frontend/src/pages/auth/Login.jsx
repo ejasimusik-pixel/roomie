@@ -2,9 +2,10 @@ import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
-import { Mail, Lock, AlertCircle, ArrowRight } from "lucide-react";
+import { Mail, Lock, AlertCircle, ArrowRight, Mail as MailHint } from "lucide-react";
 import Logo from "../../components/Logo";
 import { useAuth } from "../../context/AuthContext";
+import { mapSupabaseError } from "../../lib/errors";
 
 const GOOGLE_SVG = (
   <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden>
@@ -44,12 +45,12 @@ export default function Login() {
     setAuthError(null);
     const { data, error } = await signIn(email, password);
     if (error) {
-      setAuthError(error.message);
+      setAuthError(mapSupabaseError(error));
       return;
     }
     const role = data?.user?.user_metadata?.role || "client";
     const target =
-      location.state?.from ||
+      (typeof location.state?.from === "string" ? location.state.from : null) ||
       (role === "salon_owner"
         ? "/salon"
         : role === "admin"
@@ -61,8 +62,10 @@ export default function Login() {
   const handleGoogle = async () => {
     setAuthError(null);
     const { error } = await signInWithGoogle();
-    if (error) setAuthError(error.message);
+    if (error) setAuthError(mapSupabaseError(error));
   };
+
+  const hint = location.state?.hint;
 
   return (
     <div
@@ -95,6 +98,16 @@ export default function Login() {
                 <code className="font-mono">admin@roomie.demo</code> · pass:{" "}
                 <code className="font-mono">Roomie2026!</code>
               </p>
+            </div>
+          )}
+
+          {hint && (
+            <div
+              className="mt-5 flex items-start gap-2 rounded-2xl bg-sky-400/10 border border-sky-400/30 p-3 text-sm text-sky-700"
+              data-testid="login-hint"
+            >
+              <MailHint size={16} className="flex-shrink-0 mt-0.5" />
+              <p className="leading-snug">{hint}</p>
             </div>
           )}
 

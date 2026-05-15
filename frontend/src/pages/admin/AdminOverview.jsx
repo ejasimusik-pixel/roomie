@@ -43,10 +43,15 @@ export default function AdminOverview() {
 
   return (
     <div className="space-y-6 animate-fade-in" data-testid="admin-overview">
-      <header>
-        <p className="text-sm font-semibold text-violet-400 uppercase tracking-widest">
-          {t("admin.panel")}
-        </p>
+      <header className="space-y-1.5">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-sm font-semibold text-violet-400 uppercase tracking-widest">
+            {t("admin.panel")}
+          </p>
+          <span className="rm-chip" data-testid="admin-preview-chip">
+            Vista previa
+          </span>
+        </div>
         <h1 className="font-display font-extrabold text-3xl md:text-4xl text-violet-900 tracking-tight">
           <span className="rm-text-gradient">{t("admin.overview")}</span>
         </h1>

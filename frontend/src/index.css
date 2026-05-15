@@ -32,6 +32,13 @@ body,
   height: 100%;
 }
 
+html,
+body {
+  /* Prevent horizontal scrollbar caused by aurora blur orbs that overflow the viewport. */
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
 body {
   margin: 0;
   font-family: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;

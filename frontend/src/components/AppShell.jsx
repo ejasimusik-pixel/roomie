@@ -64,7 +64,7 @@ export default function AppShell({ role, title }) {
       <TopBar items={items} title={title} />
 
       <main className="md:pl-72">
-        <div className="max-w-6xl mx-auto px-4 md:px-8 py-6 md:py-10">
+        <div className="max-w-6xl mx-auto px-4 md:px-8 py-6 md:py-10 min-w-0">
           <Outlet />
         </div>
       </main>

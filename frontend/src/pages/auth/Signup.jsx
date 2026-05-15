@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Mail, Lock, User, AlertCircle, ArrowRight } from "lucide-react";
 import Logo from "../../components/Logo";
 import { useAuth } from "../../context/AuthContext";
+import { mapSupabaseError } from "../../lib/errors";
 
 export default function Signup() {
   const { t } = useTranslation();
@@ -33,7 +34,7 @@ export default function Signup() {
     };
     const { data, error } = await signUp(email, password, metadata);
     if (error) {
-      setAuthError(error.message);
+      setAuthError(mapSupabaseError(error));
       return;
     }
     if (data?.session) {
@@ -43,7 +44,9 @@ export default function Signup() {
     } else {
       // Email confirmation required by Supabase — send them back to login with a hint.
       navigate("/login", {
-        state: { hint: `Te enviamos un correo a ${email} para confirmar tu cuenta.` },
+        state: {
+          hint: `Te enviamos un correo a ${email} para confirmar tu cuenta. Después podrás iniciar sesión.`,
+        },
         replace: true,
       });
     }

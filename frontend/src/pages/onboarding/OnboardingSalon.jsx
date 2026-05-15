@@ -13,6 +13,7 @@ import {
 import Logo from "../../components/Logo";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../lib/supabase";
+import { mapSupabaseError } from "../../lib/errors";
 
 const COLOR_PRESETS = [
   { name: "Magenta", primary: "#E040A0", secondary: "#7C52AA" },
@@ -109,7 +110,7 @@ export default function OnboardingSalon() {
 
     if (error) {
       const msg = error.message || "";
-      let friendly = msg;
+      let friendly = mapSupabaseError(error);
       if (msg.includes("OWNER_ALREADY_HAS_SALON")) {
         friendly =
           "Ya tienes un salón asignado. Recarga la página o cierra sesión y vuelve a entrar.";
@@ -122,6 +123,9 @@ export default function OnboardingSalon() {
       } else if (msg.includes("duplicate key") || msg.includes("salons_slug_key")) {
         friendly =
           "Esa URL ya está en uso por otro salón. Elige una variante única.";
+      } else if (/function .* does not exist/i.test(msg)) {
+        friendly =
+          "Falta aplicar la migración 0002_create_my_salon.sql en Supabase. Avisa al admin.";
       }
       setServerError(friendly);
       return;

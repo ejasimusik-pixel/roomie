@@ -64,14 +64,29 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let isMounted = true;
 
+    // Hard timeout safety: never let the splash loader hang more than 12s
+    // (e.g. when Supabase is unreachable). After the timeout we surface the
+    // app in its anonymous state and let route guards handle redirects.
+    const failsafe = setTimeout(() => {
+      if (isMounted) {
+        setLoading((prev) => (prev ? false : prev));
+      }
+    }, 12000);
+
     (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!isMounted) return;
-      setSession(data.session);
-      const p = await fetchProfile(data.session?.user);
-      if (!isMounted) return;
-      setProfile(p);
-      setLoading(false);
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (!isMounted) return;
+        setSession(data.session);
+        const p = await fetchProfile(data.session?.user);
+        if (!isMounted) return;
+        setProfile(p);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn("[Roomie] getSession failed:", err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
     })();
 
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
@@ -85,6 +100,7 @@ export function AuthProvider({ children }) {
 
     return () => {
       isMounted = false;
+      clearTimeout(failsafe);
       sub?.subscription?.unsubscribe?.();
     };
   }, []);
