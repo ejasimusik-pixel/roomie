@@ -28,7 +28,8 @@ export default function Signup() {
     const metadata = {
       full_name: fullName,
       role,
-      salon_id: role === "salon_owner" ? `salon-${Math.random().toString(36).slice(2, 9)}` : null,
+      // salon_id is provisioned later by an admin (for salon_owner) or stays null (for client).
+      salon_id: null,
     };
     const { data, error } = await signUp(email, password, metadata);
     if (error) {

@@ -11,8 +11,9 @@ import { supabase, isSupabaseConfigured } from "../lib/supabase";
 const AuthContext = createContext(null);
 
 /**
- * Derives the user profile (role, salon_id, etc.) from Supabase user_metadata.
- * Once an RLS-protected `profiles` table exists, this will fetch from it instead.
+ * Last-resort projection from auth.users.user_metadata. Used only when the
+ * `profiles` row hasn't been provisioned yet (e.g. before the SQL migration
+ * has been executed) so the UI can still route the user to the right shell.
  */
 function buildProfileFromUser(user) {
   if (!user) return null;
@@ -27,6 +28,34 @@ function buildProfileFromUser(user) {
   };
 }
 
+/**
+ * Reads the canonical profile from `public.profiles`. Falls back to a
+ * metadata-derived stub if the row doesn't exist yet (RLS-safe: SELECT id =
+ * auth.uid()).
+ */
+async function fetchProfile(user) {
+  if (!user) return null;
+  if (!isSupabaseConfigured) {
+    return buildProfileFromUser(user);
+  }
+  try {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, role, salon_id, full_name, email, avatar_url, locale")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (error) {
+      // Most likely cause: migration not yet applied. Fall back gracefully.
+      console.warn("[Roomie] profiles SELECT failed, falling back:", error.message);
+      return buildProfileFromUser(user);
+    }
+    return data || buildProfileFromUser(user);
+  } catch (err) {
+    console.warn("[Roomie] profiles fetch threw, falling back:", err);
+    return buildProfileFromUser(user);
+  }
+}
+
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -39,14 +68,18 @@ export function AuthProvider({ children }) {
       const { data } = await supabase.auth.getSession();
       if (!isMounted) return;
       setSession(data.session);
-      setProfile(buildProfileFromUser(data.session?.user));
+      const p = await fetchProfile(data.session?.user);
+      if (!isMounted) return;
+      setProfile(p);
       setLoading(false);
     })();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       if (!isMounted) return;
       setSession(newSession);
-      setProfile(buildProfileFromUser(newSession?.user));
+      const p = await fetchProfile(newSession?.user);
+      if (!isMounted) return;
+      setProfile(p);
       setLoading(false);
     });
 
@@ -86,6 +119,12 @@ export function AuthProvider({ children }) {
     return supabase.auth.signOut();
   }, []);
 
+  const refreshProfile = useCallback(async () => {
+    const p = await fetchProfile(session?.user);
+    setProfile(p);
+    return p;
+  }, [session]);
+
   const value = useMemo(
     () => ({
       session,
@@ -100,8 +139,9 @@ export function AuthProvider({ children }) {
       signIn,
       signInWithGoogle,
       signOut,
+      refreshProfile,
     }),
-    [session, profile, loading, signUp, signIn, signInWithGoogle, signOut]
+    [session, profile, loading, signUp, signIn, signInWithGoogle, signOut, refreshProfile]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -9,24 +9,24 @@
 Crear la arquitectura base de una plataforma SaaS PWA llamada ROOMIE.
 
 - Stack: Supabase (Auth + PostgreSQL), arquitectura PWA, mobile-first responsive.
-- Diseño: Luxury Minimal, Glassmorphism, Manrope, gradientes pastel (rosa #f9a8d4, azul #4285F4), sombras suaves, interfaz femenina premium. Inspiraciones: Apple, Headspace, Glossier, skincare luxury apps.
+- Diseño: Luxury Minimal, Glassmorphism, Manrope, gradientes pastel (rosa #f9a8d4, azul #4285F4), sombras suaves, interfaz femenina premium.
 - Roles: `client`, `salon_owner`, `admin`.
 - Páginas: Landing, Auth, Dashboard cliente, Workspace salón, Panel admin.
 - Login: Google OAuth + email/password.
 - Multi-tenant: todas las entidades llevarán `salon_id`.
 - Rutas protegidas por rol.
 - Navegación responsive.
-- **NO implementar todavía**: IA, pagos, promo codes, RLS.
+- **NO implementar todavía**: IA, pagos, promo codes.
 
 ---
 
 ### Architecture
-- **Frontend**: React 18 (CRA), `react-router-dom` v6, `@supabase/supabase-js` v2, `react-i18next`, `react-hook-form`, `lucide-react`, Tailwind 3. PWA-ready (manifest + theme color + apple-touch).
-- **Backend**: Supabase-first (serverless). `/app/backend/server.py` es sólo un stub FastAPI con `/api/` y `/api/health`; **no** contiene lógica de negocio.
-- **Auth**: Supabase client desde el browser. Cuando `REACT_APP_SUPABASE_URL` y `REACT_APP_SUPABASE_ANON_KEY` están vacíos, el cliente cae automáticamente en un **mock localStorage** con 3 usuarios sembrados (modo demo). Al añadir las keys, la app pasa al backend real sin cambios de código.
-- **Roles** se almacenan en `user_metadata.role` (`client` | `salon_owner` | `admin`). El `salon_id` también va en `user_metadata`.
-- **Rutas protegidas**: `<ProtectedRoute allowedRoles={[...]}>` redirige a `/login` o `/unauthorized` según corresponda.
-- **i18n**: Español por defecto, inglés disponible, toggle persistido en localStorage (`roomie.lang`).
+- **Frontend**: React 18 (CRA), `react-router-dom` v6, `@supabase/supabase-js` v2, `react-i18next`, `react-hook-form`, `lucide-react`, Tailwind 3. PWA-ready.
+- **Backend**: 100% Supabase (PostgreSQL + Auth + RLS). El archivo `/app/backend/server.py` es sólo un health-stub.
+- **Auth**: Supabase client desde el browser. Las credenciales reales están en `/app/frontend/.env`. Hay un fallback automático a un mock localStorage cuando las keys están vacías (modo demo).
+- **Multi-tenant**: tabla `salons` como raíz. Todas las tablas derivadas llevan `salon_id`. `profiles.salon_id` es nullable (admin global + clientas sin salón).
+- **RLS activo desde el primer día** con dos helpers `security definer` (`public.current_role()`, `public.current_salon_id()`) para evitar recursión.
+- **i18n**: Español por defecto, inglés disponible, toggle persistente.
 
 ### Tech Stack
 | Capa | Tecnología |
@@ -34,84 +34,93 @@ Crear la arquitectura base de una plataforma SaaS PWA llamada ROOMIE.
 | UI | React 18, Tailwind 3, Manrope, lucide-react |
 | Routing | react-router-dom v6 |
 | Forms | react-hook-form |
-| Auth/DB | Supabase (con fallback demo en localStorage) |
+| Auth/DB | Supabase (real conectado: `dxfqnwdwqmuyyzpdlgcl.supabase.co`) |
 | i18n | i18next + react-i18next |
 | PWA | manifest.json + meta theme-color + apple-touch-icon |
 | Backend stub | FastAPI (health only) |
 
+### Database schema (v1)
+Migración: `/app/supabase/migrations/0001_initial.sql`
+
+Tablas: `salons`, `profiles`, `services`, `products`, `appointments`, `client_profiles`, `hair_profiles`, `onboarding_answers`.
+
+Características clave:
+- Todas las tablas tienen `created_at`/`updated_at` (mantenidos por trigger compartido).
+- Todas las tablas excepto `salons` llevan `salon_id`.
+- `profiles.salon_id` es nullable por diseño.
+- `roomie_personality jsonb` en `salons` (reservado para IA contextual futura).
+- Trigger `on_auth_user_created` en `auth.users` provisiona `profiles` automáticamente leyendo `role`/`salon_id`/`full_name` desde `raw_user_meta_data`.
+- RLS policies cubren `client`, `salon_owner` y `admin` con scoping multi-tenant.
+- Índices: `salon_id` en cada tabla, `slug` en salons, `(salon_id, starts_at)` en appointments, etc.
+
 ### File Layout (frontend)
 ```
 src/
-├── App.js                       # router + route guards
-├── index.js, index.css          # entry + global styles (tokens + glass)
-├── lib/
-│   ├── supabase.js              # real client OR localStorage demo
-│   └── i18n.js                  # ES/EN config
+├── App.js, index.js, index.css
+├── lib/{supabase.js, i18n.js}
 ├── locales/{es,en}.json
-├── context/AuthContext.jsx      # session + role + auth methods
-├── components/
-│   ├── Logo.jsx, AppShell.jsx
-│   ├── Sidebar.jsx, TopBar.jsx, BottomNav.jsx
-│   ├── ProtectedRoute.jsx
-│   ├── GlassCard.jsx, StatCard.jsx
+├── context/AuthContext.jsx     # lee profile desde public.profiles vía Supabase
+├── components/{Logo, AppShell, Sidebar, TopBar, BottomNav, ProtectedRoute, GlassCard, StatCard}.jsx
 └── pages/
     ├── Landing.jsx, Unauthorized.jsx, Placeholder.jsx
-    ├── auth/{Login,Signup,AuthCallback}.jsx
+    ├── auth/{Login, Signup, AuthCallback}.jsx
     ├── client/ClientHome.jsx
     ├── salon/SalonOverview.jsx
     └── admin/AdminOverview.jsx
 ```
 
 ### User Personas
-1. **Sofía — Clienta premium** (rol `client`): busca un concierge de belleza calmado y elegante; descubre salones high-ticket, reserva sin fricción, guarda favoritos.
-2. **Valentina — Propietaria de salón** (rol `salon_owner`): gestiona agenda, clientas, servicios y equipo; analiza ocupación e ingresos del mes.
-3. **Roomie Admin** (rol `admin`): supervisa salones, usuarias y salud de la plataforma.
+1. **Sofía — Clienta premium** (rol `client`).
+2. **Valentina — Propietaria de salón** (rol `salon_owner`).
+3. **Roomie Admin** (rol `admin`).
 
-### Core Requirements (static)
-- [x] Multi-tenant (`salon_id` listo en `user_metadata`, pendiente de tabla `profiles` cuando se active Supabase real).
+### Core Requirements (status)
+- [x] Multi-tenant con `salon_id` en todas las tablas.
 - [x] Auth con email/password y botón Google OAuth listo.
 - [x] Rutas protegidas por rol.
 - [x] Navegación responsive (sidebar desktop + bottom-nav mobile + drawer menu).
-- [x] Estructura escalable (carpetas por rol, componentes reutilizables, layout único AppShell).
+- [x] Estructura escalable.
 - [x] UI Luxury Minimal con glassmorphism, Manrope, gradiente azul→violeta→magenta.
 - [x] i18n ES/EN con switch persistente.
-- [x] PWA-ready (manifest + theme + icons).
+- [x] PWA-ready.
+- [x] Schema SQL multi-tenant con RLS activo.
+- [x] AuthContext leyendo `public.profiles` con fallback graceful.
 
-### What's been implemented — 2026-01-15
-- Arquitectura completa frontend React + Supabase client (con modo demo localStorage).
-- Stub FastAPI con health endpoints.
-- Landing pública con hero, features y CTAs.
-- Auth: `/login`, `/signup`, `/auth/callback`, `/unauthorized`.
-- Layout único AppShell con Sidebar (md+), TopBar (mobile) y BottomNav (mobile).
-- Dashboard Cliente con saludo, próxima reserva, salones destacados, secciones placeholder de rituales/favoritos.
-- Workspace Salón con 4 KPIs, próximas citas y atajos.
-- Panel Admin con 4 KPIs y placeholders por sección.
-- 11 sub-rutas con placeholders elegantes.
-- i18n ES/EN completo.
-- 3 usuarios demo sembrados automáticamente.
-- Testing agent: backend 3/3 ✅, frontend 33/33 ✅.
+### Timeline
+**2026-01-15 — MVP architecture v1**
+- Frontend completo, todos los flujos auth funcionando contra mock.
+- Backend stub.
+- Testing 100% (33/33 frontend, 3/3 backend).
 
-### Prioritized Backlog (siguiente sprint)
-**P0 — Conectar Supabase real**
-- Recibir `SUPABASE_URL` y `SUPABASE_ANON_KEY` del usuario y poblarlas en `/app/frontend/.env`.
-- Crear migración SQL inicial: tabla `salons` y tabla `profiles` (con `salon_id`).
-- Configurar Google OAuth en el dashboard de Supabase + redirect URL.
-- Activar trigger `auth.users` → `public.profiles`.
+**2026-01-15 — Supabase real conectado**
+- Keys reales en `/app/frontend/.env` (`dxfqnwdwqmuyyzpdlgcl`).
+- `AuthContext` ahora consulta `public.profiles` (con fallback a metadata si la migración aún no se ha ejecutado).
+- Login contra Supabase real verificado (errores reales del servicio).
+- Migración SQL completa generada en `/app/supabase/migrations/0001_initial.sql` (pendiente: usuario debe ejecutarla en el SQL Editor).
 
-**P1 — Datos reales y CRUD básicos**
-- Endpoints/queries Supabase para: salones, servicios, equipo, agenda, reservas.
-- Reemplazar mocks visuales del cliente y salón por datos en vivo.
-- Subida de avatar e imágenes de salón a Supabase Storage.
+### Prioritized Backlog
 
-**P2 — Funcionalidad diferida (declarada NO en MVP)**
-- Recomendaciones IA (concierge).
-- Pagos (Stripe / MercadoPago).
-- Promo codes.
-- RLS policies por tenant.
-- Métricas reales en panel admin.
+**P0 — Activar el backend real (acción manual del usuario)**
+- [ ] Ejecutar `0001_initial.sql` en el SQL Editor de Supabase.
+- [ ] Configurar redirect URL (`/auth/callback`) en Authentication → URL Configuration.
+- [ ] Promover primera cuenta admin (`update profiles set role='admin' where email=…`).
+- [ ] Configurar Google como Auth Provider en Supabase (Client ID/Secret).
+
+**P1 — Datos reales en UI**
+- [ ] Reemplazar mocks visuales del cliente y salón por queries a Supabase.
+- [ ] CRUD de servicios/productos en el workspace del salón.
+- [ ] CRUD de appointments con calendar view.
+- [ ] Subida de avatar + logos a Supabase Storage.
+
+**P2 — Funcionalidades diferidas (declaradas NO en MVP)**
+- [ ] Onboarding emocional de 3 pasos (cabello + piel + estilo de vida).
+- [ ] IA concierge sobre `roomie_personality` + `hair_profiles`.
+- [ ] Pagos (Stripe / MercadoPago).
+- [ ] Promo codes.
+- [ ] Métricas reales en panel admin.
 
 ### Next Tasks
-1. Recoger keys de Supabase del usuario y conectarlas.
-2. Crear schema SQL inicial (salons + profiles + handle_new_user trigger).
-3. Configurar Google OAuth provider en Supabase y validar callback en producción.
-4. Reemplazar datos seed visuales del dashboard cliente/salón por queries Supabase.
+1. Usuario ejecuta `0001_initial.sql` en Supabase.
+2. Usuario hace primer signup; verificamos que el trigger crea su `profiles` row.
+3. Promovemos esa cuenta a `admin`.
+4. Empezamos a conectar UI a datos reales empezando por dashboard salón (services + appointments).
