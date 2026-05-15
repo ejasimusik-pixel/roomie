@@ -98,6 +98,12 @@ src/
 - Login contra Supabase real verificado (errores reales del servicio).
 - Migración SQL completa generada en `/app/supabase/migrations/0001_initial.sql` (pendiente: usuario debe ejecutarla en el SQL Editor).
 
+**2026-01-15 — Onboarding del salón**
+- Nueva migración `0002_create_my_salon.sql` con función RPC `public.create_my_salon(...)` (security definer) que valida que el caller es `salon_owner` sin `salon_id`, crea la fila en `salons` y actualiza `profiles.salon_id` atómicamente.
+- Nueva página `/onboarding/salon` (Manrope · glassmorphism · 3 secciones: Identidad, Paleta visual, Voz de Roomie) con live preview, presets de color y campos `roomie_personality` (tone/style/emoji_level/sales_style).
+- Componente `SalonOnboardingGate` que envuelve `/salon/*` y redirige a `/onboarding/salon` cuando `role='salon_owner' AND salon_id IS NULL`.
+- Tras crear el salón, `refreshProfile()` actualiza el contexto y redirige a `/salon`.
+
 ### Prioritized Backlog
 
 **P0 — Activar el backend real (acción manual del usuario)**

@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
+import SalonOnboardingGate from "./components/SalonOnboardingGate";
 import AppShell from "./components/AppShell";
 
 import Landing from "./pages/Landing";
@@ -8,6 +9,7 @@ import Login from "./pages/auth/Login";
 import Signup from "./pages/auth/Signup";
 import AuthCallback from "./pages/auth/AuthCallback";
 import Unauthorized from "./pages/Unauthorized";
+import OnboardingSalon from "./pages/onboarding/OnboardingSalon";
 
 import ClientHome from "./pages/client/ClientHome";
 import SalonOverview from "./pages/salon/SalonOverview";
@@ -82,12 +84,24 @@ export default function App() {
         />
       </Route>
 
+      {/* Salon onboarding (gates /salon access) */}
+      <Route
+        path="/onboarding/salon"
+        element={
+          <ProtectedRoute allowedRoles={["salon_owner"]}>
+            <OnboardingSalon />
+          </ProtectedRoute>
+        }
+      />
+
       {/* Salon workspace */}
       <Route
         path="/salon"
         element={
           <ProtectedRoute allowedRoles={["salon_owner", "admin"]}>
-            <AppShell role="salon_owner" title="Workspace" />
+            <SalonOnboardingGate>
+              <AppShell role="salon_owner" title="Workspace" />
+            </SalonOnboardingGate>
           </ProtectedRoute>
         }
       >

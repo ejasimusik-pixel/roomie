@@ -41,7 +41,11 @@ export default function Signup() {
         role === "salon_owner" ? "/salon" : role === "admin" ? "/admin" : "/app";
       navigate(target, { replace: true });
     } else {
-      navigate("/auth/check-email", { state: { email } });
+      // Email confirmation required by Supabase — send them back to login with a hint.
+      navigate("/login", {
+        state: { hint: `Te enviamos un correo a ${email} para confirmar tu cuenta.` },
+        replace: true,
+      });
     }
   };
 
