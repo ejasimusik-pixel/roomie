@@ -1,0 +1,33 @@
+{
+  "summary": "Iter 6 — Tested the onboarding salon redirect loop bug fix. RESULT: BUG IS FIXED. Full flow tested twice with new salon_owner accounts: signup → /onboarding/salon → fill form → submit → lands on /salon dashboard. URL stays at /salon for 12s with no redirect back to /onboarding/salon. The salon dashboard renders correctly with the new salon name and the welcome modal 'Tu salón, elevado'. The TOKEN_REFRESHED skip in onAuthStateChange + applyLocalProfile patch + removed refreshProfile() fire-and-forget together resolve the race condition.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_6.json"],
+  "action_items": [
+    "Previously reported Supabase RLS stall on public.salons SELECT for authenticated role (iter 5) still unresolved — but out of scope for this iteration (iter 6 only tests onboarding loop fix)"
+  ],
+  "critical_code_review_comments": [
+    "OnboardingSalon.onSubmit: refreshProfile() correctly removed; applyLocalProfile({salon_id, role}) + navigate('/salon', {replace:true}) is clean.",
+    "AuthContext.onAuthStateChange: TOKEN_REFRESHED skip is correct and safe — avoids stale DB read racing with local patch.",
+    "AuthContext.refreshProfile: smart merge (preserve salon_id from prev if DB returns null) is a good defensive fallback.",
+    "SalonOnboardingGate: gate correctly allows through once salonId is set via applyLocalProfile."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "N/A (frontend-only)",
+    "frontend": "5/5 test cases PASS: signup works, onboarding form works, submit creates salon, redirects to /salon, no loop after 12s"
+  },
+  "test_credentials": "Created: salon.iter6.1779081621@roomie.app / Roomie2026! (salon_owner, no salon yet - but salon created during test). Created: salon.iter6b.1779081670@roomie.app / Roomie2026! (salon_owner, salon 'TestB Salon 1779081670' created).",
+  "seed_data_creation": "Two new salon_owner accounts created in Supabase with salons.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Onboarding loop bug FIXED and verified. The Supabase RLS stall on public.salons for authenticated role (iter 5 critical issue) is still outstanding — affects /app/discover and /discover/:slug for logged-in users. That is the next priority. Login with valentina@aurorabeauty.lab / Roomie2026! and go to /app/discover to reproduce.",
+  "rca of the issue": "Root cause was a race condition: (1) refreshProfile() called fire-and-forget before navigate('/salon'), (2) onAuthStateChange TOKEN_REFRESHED re-fetched profile from DB (potentially stale, salon_id=null), (3) this overwrote the applyLocalProfile patch, (4) SalonOnboardingGate saw salon_id=null and redirected back to /onboarding/salon. Fix: remove refreshProfile() call in onSubmit, skip TOKEN_REFRESHED in onAuthStateChange, add smart merge in refreshProfile to preserve salon_id."
+}

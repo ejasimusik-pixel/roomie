@@ -165,8 +165,9 @@ export default function OnboardingSalon() {
       applyLocalProfile({ salon_id: newSalon.id, role: "salon_owner" });
     }
 
-    // Best-effort canonical refresh (won't block navigation if Supabase lags).
-    refreshProfile?.();
+    // NOTE: Do NOT call refreshProfile() here — it would fire-and-forget an
+    // async DB fetch that races with the navigation and can overwrite the local
+    // salon_id patch with stale data, causing SalonOnboardingGate to loop.
     navigate("/salon", { replace: true });
   };
 

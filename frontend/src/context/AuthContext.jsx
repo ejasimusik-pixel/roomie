@@ -110,6 +110,16 @@ export function AuthProvider({ children }) {
       if (!isMounted) return;
       latestSession = newSession;
       setSession(newSession);
+
+      // TOKEN_REFRESHED is a background event that only rotates the JWT.
+      // Re-fetching the profile here races with in-flight local patches
+      // (e.g. applyLocalProfile after salon creation) and can overwrite
+      // salon_id with a stale null, causing an onboarding redirect loop.
+      if (_event === 'TOKEN_REFRESHED') {
+        setLoading(false);
+        return;
+      }
+
       const p = await fetchProfile(newSession?.user);
       if (!isMounted) return;
       setProfile(p);
@@ -155,7 +165,15 @@ export function AuthProvider({ children }) {
 
   const refreshProfile = useCallback(async () => {
     const p = await fetchProfile(session?.user);
-    setProfile(p);
+    // Smart merge: never overwrite a locally-applied salon_id with null from
+    // a potentially stale DB read (race condition after salon creation RPC).
+    setProfile((prev) => {
+      if (!p) return prev;
+      if (prev?.salon_id && !p.salon_id) {
+        return { ...p, salon_id: prev.salon_id, role: prev.role || p.role };
+      }
+      return p;
+    });
     return p;
   }, [session]);
 
