@@ -52,6 +52,9 @@ arquitectura core ni el schema Supabase.
 - ✅ Chat real con Gemini 2.5 Flash y Claude Sonnet 4.5 (cambio dinámico de modelo persistido).
 - ✅ Tutorial dispara solo la primera vez, skip-able, persiste flag.
 
+## Bug fixes (post sprint final)
+- ✅ **[2026-05-18] Onboarding salón loop bug**: race condition entre `refreshProfile()` fire-and-forget + `TOKEN_REFRESHED` en `onAuthStateChange` sobreescribía `applyLocalProfile` con `salon_id=null`, causando redirect loop. Fix: (1) removido `refreshProfile()` de `OnboardingSalon.onSubmit`, (2) TOKEN_REFRESHED skipeado en `onAuthStateChange`, (3) smart merge en `refreshProfile` preserva `salon_id`. Verificado 5/5 con testing agent.
+
 ## Backlog post-demo
 - **P1**: Edge Functions (Vision real, Logo Studio real, Product Extraction, Service Suggestions) según AI_ROADMAP.md.
 - **P1**: Stripe real reemplazando Apple Pay mock (`CheckoutMockModal`).
