@@ -108,9 +108,9 @@ export default function Services() {
       ) : rows.length === 0 ? (
         <EmptyState
           icon={Scissors}
-          title="Aún no has creado servicios"
-          description="Comienza con un servicio insignia para que tus clientas puedan reservar."
-          cta="Crear primer servicio"
+          title="Tu menú de autor te espera"
+          description="Diseña y cura los rituales de belleza que volverán locas a tus clientas. Entra a las grandes ligas con tu primer servicio estrella."
+          cta="Diseñar mi primer ritual"
           onAction={startCreate}
           testId="services-empty"
         />

@@ -6,8 +6,11 @@ import {
   Package,
   Plus,
   Sparkles,
+  Lightbulb,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { suggestServicesForSalon } from "../../lib/ai";
+import { PremiumGate } from "../../components/ui/PremiumGate";
 import { supabase } from "../../lib/supabase";
 import { mapSupabaseError } from "../../lib/errors";
 import StatCard from "../../components/StatCard";
@@ -26,6 +29,8 @@ export default function SalonOverview() {
   const [upcoming, setUpcoming] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [insights, setInsights] = useState([]);
+  const [loadingInsights, setLoadingInsights] = useState(true);
 
   const refresh = useCallback(async () => {
     if (!salonId) return;
@@ -89,6 +94,13 @@ export default function SalonOverview() {
       });
       setUpcoming(apRes?.data || []);
       setSalon(sRes?.data || null);
+
+      if (sRes?.data) {
+        suggestServicesForSalon(sRes.data, []).then(res => {
+          setInsights(res.suggestions || []);
+          setLoadingInsights(false);
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -200,9 +212,9 @@ export default function SalonOverview() {
         ) : upcoming.length === 0 ? (
           <EmptyState
             icon={CalendarRange}
-            title="Sin citas próximas"
-            description="Cuando una clienta reserve, aparecerá aquí. Por ahora ve creando tu catálogo."
-            cta="Ir a Servicios"
+            title="Tu lienzo en blanco"
+            description="Las grandes agendas empiezan así. Mientras recibes tus primeras reservas premium, asegúrate de tener todo tu catálogo brillante."
+            cta="Diseñar mis servicios"
             onAction={() => (window.location.href = "/salon/services")}
             testId="upcoming-empty"
             className="!shadow-none !border-0 !bg-transparent"
@@ -249,6 +261,41 @@ export default function SalonOverview() {
         )}
       </GlassCard>
 
+      {/* Roomie Sugiere (P0 AI Lite) */}
+      <PremiumGate featureId="roomie_suggests">
+        <GlassCard testId="salon-roomie-suggests" className="border border-magenta-500/20 bg-gradient-to-br from-magenta-500/5 to-violet-500/5 shadow-glow" hoverable={false}>
+          <div className="flex items-center gap-2 mb-4">
+            <span className="p-2 bg-gradient-to-br from-magenta-500 to-violet-500 rounded-xl shadow-glow text-white">
+              <Lightbulb size={20} strokeWidth={2} />
+            </span>
+            <h2 className="font-display font-bold text-xl text-violet-900 dark:text-white">
+              Roomie Sugiere ✨
+            </h2>
+          </div>
+          
+          {loadingInsights ? (
+             <Skeleton count={2} className="space-y-3" />
+          ) : (
+            <div className="grid sm:grid-cols-2 gap-4">
+              {insights.map((insight, idx) => (
+                <div key={idx} className="bg-white/60 dark:bg-gray-800/60 p-5 rounded-2xl flex flex-col justify-between hover:scale-[1.02] transition-transform duration-300 shadow-soft">
+                  <div>
+                    <div className="flex justify-between items-start mb-2">
+                      <h4 className="font-bold text-violet-900 dark:text-white font-display text-lg leading-tight">{insight.name}</h4>
+                      <span className="text-xs font-bold text-magenta-500 bg-magenta-500/10 px-2 py-1 rounded-full">{insight.est_price}</span>
+                    </div>
+                    <p className="text-sm text-violet-600 dark:text-gray-300 font-medium leading-relaxed mb-4">{insight.rationale}</p>
+                  </div>
+                  <button className="text-xs font-bold text-left text-magenta-500 hover:text-magenta-600 transition-colors uppercase tracking-widest flex items-center gap-1">
+                    <Plus size={14}/> Agregar a servicios
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </GlassCard>
+      </PremiumGate>
+
       {/* Quick actions */}
       <section className="grid sm:grid-cols-3 gap-4">
         <Link
@@ -277,7 +324,7 @@ export default function SalonOverview() {
             Gestiona tus productos
           </p>
           <p className="text-sm text-violet-500 mt-1">
-            Recomienda los productos que vendes.
+            Comparte tus recomendaciones estrella.
           </p>
           <span className="inline-flex items-center gap-1 mt-3 text-sm font-semibold text-violet-500">
             <Plus size={14} /> Nuevo producto

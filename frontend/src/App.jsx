@@ -3,6 +3,7 @@ import { useAuth } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import SalonOnboardingGate from "./components/SalonOnboardingGate";
 import AppShell from "./components/AppShell";
+import { Toaster } from "sonner";
 
 import Landing from "./pages/Landing";
 import Login from "./pages/auth/Login";
@@ -20,6 +21,7 @@ import Services from "./pages/salon/Services";
 import Products from "./pages/salon/Products";
 import AdminOverview from "./pages/admin/AdminOverview";
 import Placeholder from "./pages/Placeholder";
+import RoomieChat from "./pages/chat/RoomieChat";
 
 function FullScreenLoader() {
   return (
@@ -36,11 +38,15 @@ function FullScreenLoader() {
 
 export default function App() {
   const { loading } = useAuth();
+  
+  // Need to unwrap useAI and aiStudioOpen logic ONLY if it's placed inside a route that has Context, Wait, AppShell has useAI, we don't need it here.
   if (loading) return <FullScreenLoader />;
 
   return (
-    <Routes>
-      {/* Public */}
+    <>
+      <Toaster position="bottom-right" richColors />
+      <Routes>
+        {/* Public */}
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
@@ -58,6 +64,7 @@ export default function App() {
         }
       >
         <Route index element={<ClientHome />} />
+        <Route path="concierge" element={<RoomieChat />} />
         <Route path="discover" element={<Discover />} />
         <Route path="vision" element={<Vision />} />
         <Route
@@ -104,6 +111,7 @@ export default function App() {
         }
       >
         <Route index element={<SalonOverview />} />
+        <Route path="concierge" element={<RoomieChat />} />
         <Route
           path="agenda"
           element={
@@ -181,6 +189,7 @@ export default function App() {
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+    </>
   );
 }

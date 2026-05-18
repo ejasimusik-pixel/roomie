@@ -14,11 +14,15 @@ import {
   Building2,
   Activity,
   Wand2,
+  Bot,
+  MessageCircleHeart,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import Sidebar from "./Sidebar";
 import BottomNav from "./BottomNav";
 import TopBar from "./TopBar";
+import AIStudioConfigurator from "./AIStudioConfigurator";
+import { useAI } from "../context/AIContext";
 
 /**
  * AppShell — the single reusable layout for every authenticated experience.
@@ -30,9 +34,11 @@ import TopBar from "./TopBar";
  */
 export default function AppShell({ role, title }) {
   const { t } = useTranslation();
+  const { setAiStudioOpen } = useAI();
 
   const clientItems = [
     { to: "/app", label: t("nav.home"), icon: Home },
+    { to: "/app/concierge", label: "Concierge", icon: MessageCircleHeart },
     { to: "/app/discover", label: t("nav.discover"), icon: Sparkles },
     { to: "/app/vision", label: "Vision", icon: Wand2 },
     { to: "/app/bookings", label: t("nav.bookings"), icon: CalendarHeart },
@@ -41,6 +47,7 @@ export default function AppShell({ role, title }) {
 
   const salonItems = [
     { to: "/salon", label: t("nav.overview"), icon: LayoutDashboard },
+    { to: "/salon/concierge", label: "AI Business", icon: MessageCircleHeart },
     { to: "/salon/agenda", label: t("nav.agenda"), icon: CalendarRange },
     { to: "/salon/services", label: t("nav.services"), icon: Scissors },
     { to: "/salon/products", label: "Productos", icon: Package },
@@ -74,6 +81,18 @@ export default function AppShell({ role, title }) {
       </main>
 
       <BottomNav items={items} testId={`bottom-nav`} />
+      
+      {role !== 'admin' && (
+        <button
+          onClick={() => setAiStudioOpen(true)}
+          className="fixed bottom-24 md:bottom-8 right-6 z-40 bg-gradient-to-r from-magenta-500 to-violet-500 text-white p-3 rounded-full shadow-[0_0_20px_rgba(200,60,180,0.4)] transform hover:scale-110 transition-transform"
+          title="Roomie Intelligence (Dev/Demo)"
+        >
+          <Bot size={22} />
+        </button>
+      )}
+
+      <AIStudioConfigurator />
     </div>
   );
 }

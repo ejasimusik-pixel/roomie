@@ -108,9 +108,9 @@ export default function Products() {
       ) : rows.length === 0 ? (
         <EmptyState
           icon={Package}
-          title="Aún no has añadido productos"
-          description="Comparte los productos premium que recomiendas a tus clientas."
-          cta="Añadir primer producto"
+          title="Tu escaparate está vacío"
+          description="Es el momento de nutrir tu vitrina de lujo. Recomienda a tus clientas los productos que te definen."
+          cta="Añadir producto icónico"
           onAction={startCreate}
           testId="products-empty"
         />
