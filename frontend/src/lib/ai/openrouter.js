@@ -3,32 +3,32 @@
  * Handles interaction with OpenRouter AI for Dual Persona capabilities.
  */
 
-// Model Registry
+// Model Registry (verified active on OpenRouter · 2026)
 export const AI_MODELS = {
   FAST: {
-    id: "google/gemini-flash-1.5",
-    name: "Gemini Flash 1.5",
+    id: "google/gemini-2.5-flash",
+    name: "Gemini 2.5 Flash",
     category: "Rápido ⚡",
     description: "Ideal para conversaciones rápidas y dinámicas.",
     costLevel: 1
   },
   PREMIUM: {
-    id: "anthropic/claude-3.5-sonnet",
-    name: "Claude 3.5 Sonnet",
+    id: "anthropic/claude-sonnet-4.5",
+    name: "Claude Sonnet 4.5",
     category: "Premium ✨",
     description: "Equilibrio perfecto entre velocidad y alta calidad emocional.",
     costLevel: 2
   },
   CREATIVE: {
-    id: "anthropic/claude-3-opus",
-    name: "Claude 3 Opus",
+    id: "anthropic/claude-opus-4",
+    name: "Claude Opus 4",
     category: "Creativo 🎨",
     description: "Máxima inteligencia. Ideal para copywriting y estrategias de salón.",
     costLevel: 3
   },
   ECONOMIC: {
-    id: "meta-llama/llama-3-8b-instruct:free",
-    name: "Llama 3 (Free)",
+    id: "meta-llama/llama-3.3-70b-instruct:free",
+    name: "Llama 3.3 70B (Free)",
     category: "Económico 💸",
     description: "Testeo rápido sin costo de API.",
     costLevel: 0

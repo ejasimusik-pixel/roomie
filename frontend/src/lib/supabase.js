@@ -1,7 +1,7 @@
 /**
  * Supabase client with graceful demo fallback.
  *
- * If REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY are configured,
+ * If VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are configured,
  * the real Supabase client is used. Otherwise, a localStorage-backed mock
  * client allows the architecture (auth flows, role routing, UI) to be tested
  * before keys are provisioned. The same surface area is exposed in both modes
