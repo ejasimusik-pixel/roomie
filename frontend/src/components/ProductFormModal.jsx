@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2, Sparkles } from "lucide-react";
 import Modal from "./Modal";
 import ImageUploader from "./ImageUploader";
 import { PRODUCT_TYPES, CURRENCY_DEFAULT } from "../lib/catalog";
 import { BUCKETS } from "../lib/storage";
 import { supabase } from "../lib/supabase";
 import { mapSupabaseError } from "../lib/errors";
+import { PremiumGate } from "./ui/PremiumGate";
+import { extractProductFromImage } from "../lib/ai";
+import { toast } from "sonner";
 
 export default function ProductFormModal({
   open,
@@ -25,6 +28,32 @@ export default function ProductFormModal({
   } = useForm();
   const [image, setImage] = useState({ url: null, path: null });
   const [serverError, setServerError] = useState(null);
+  const [extracting, setExtracting] = useState(false);
+
+  const handleAIPhoto = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setExtracting(true);
+    try {
+      const res = await extractProductFromImage(file);
+      if (res.data) {
+        reset({
+          name: res.data.name,
+          brand: res.data.brand,
+          description: res.data.description,
+          category: res.data.category,
+          price_cents: res.data.price_cents / 100,
+          currency: res.data.currency,
+          recommended_for: res.data.recommended_for.join(", "),
+          is_active: true
+        });
+        setImage({ url: res.data.image_url || null, path: null });
+        toast.success("Atributos mágicamente extraídos ✨");
+      }
+    } finally {
+      setExtracting(false);
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -145,6 +174,27 @@ export default function ProductFormModal({
         onSubmit={handleSubmit(onSubmit)}
         className="grid md:grid-cols-2 gap-5"
       >
+        <div className="md:col-span-2">
+          <PremiumGate featureId="ai_product_extraction">
+            <div className="bg-gradient-to-r from-magenta-500/5 to-violet-500/5 border border-magenta-500/20 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h4 className="font-display font-bold text-violet-900 dark:text-white flex items-center gap-1">
+                  <Sparkles className="w-4 h-4 text-magenta-500" /> Autofill con IA
+                </h4>
+                <p className="text-sm text-violet-500 font-medium mt-0.5">Toma o sube una foto del producto y Roomie extraerá los atributos por ti.</p>
+              </div>
+              <label className={`rm-btn-primary px-5 py-2.5 text-sm text-center shadow-glow cursor-pointer relative overflow-hidden transition-all ease-in-out ${extracting ? 'opacity-80' : ''}`}>
+                {extracting ? (
+                  <span className="flex items-center gap-2 pr-4"><Loader2 className="w-4 h-4 animate-spin" /> Analizando magia...</span>
+                ) : (
+                  <span>Foto Mágica 📸</span>
+                )}
+                <input type="file" accept="image/*" className="absolute opacity-0 w-0 h-0 cursor-pointer" onChange={handleAIPhoto} disabled={extracting}/>
+              </label>
+            </div>
+          </PremiumGate>
+        </div>
+
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>

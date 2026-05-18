@@ -25,6 +25,8 @@ function buildProfileFromUser(user) {
     role: meta.role || "client",
     salon_id: meta.salon_id ?? null,
     avatar_url: meta.avatar_url ?? null,
+    salon: { plan_type: 'free' },
+    client_profile: { client_plan: 'free' },
   };
 }
 
@@ -44,7 +46,11 @@ async function fetchProfile(user) {
   try {
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, role, salon_id, full_name, email, avatar_url, locale")
+      .select(`
+        id, role, salon_id, full_name, email, avatar_url, locale,
+        salon:salons(plan_type),
+        client_profile:client_profiles(client_plan)
+      `)
       .eq("id", user.id)
       .maybeSingle();
     if (error) {
@@ -169,6 +175,8 @@ export function AuthProvider({ children }) {
       isAuthenticated: !!session,
       role: profile?.role || null,
       salonId: profile?.salon_id || null,
+      salonPlan: profile?.salon?.plan_type || 'free',
+      clientPlan: profile?.client_profile?.client_plan || 'free',
       isDemoBackend: !isSupabaseConfigured,
       signUp,
       signIn,

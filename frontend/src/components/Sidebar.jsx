@@ -3,6 +3,7 @@ import { LogOut } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import Logo from "./Logo";
+import { Sparkles } from "lucide-react";
 
 /**
  * Desktop sidebar (hidden on mobile). Pure presentation; receives its links
@@ -10,8 +11,10 @@ import Logo from "./Logo";
  */
 export default function Sidebar({ items, testId = "sidebar" }) {
   const { t } = useTranslation();
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, role, salonPlan, clientPlan } = useAuth();
   const navigate = useNavigate();
+
+  const currentPlan = role === 'client' ? clientPlan : salonPlan;
 
   const handleLogout = async () => {
     await signOut();
@@ -75,10 +78,15 @@ export default function Sidebar({ items, testId = "sidebar" }) {
           </div>
           <div className="flex-1 min-w-0">
             <p
-              className="text-sm font-semibold text-violet-900 truncate"
+              className="text-sm font-semibold text-violet-900 truncate flex items-center gap-2"
               data-testid="sidebar-user-name"
             >
               {profile?.full_name}
+              {(currentPlan === 'pro' || currentPlan === 'premium') && (
+                <span className="text-[9px] uppercase tracking-wider bg-gradient-to-r from-magenta-500 to-violet-500 text-white px-1.5 py-0.5 rounded shadow-glow flex items-center gap-0.5">
+                  <Sparkles size={8} /> Pro
+                </span>
+              )}
             </p>
             <p className="text-xs text-violet-400 truncate">{profile?.email}</p>
           </div>

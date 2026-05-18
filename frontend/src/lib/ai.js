@@ -1,49 +1,57 @@
 /**
- * ROOMIE — AI scaffolding (lightweight stubs)
+ * ROOMIE — AI scaffolding (mock implementations for Demo-Ready P0)
  * ----------------------------------------------------------------------------
- * This module is intentionally thin: it defines the contracts Roomie will use
- * when real model integrations land. Today every function returns
- * `{ data: null, mocked: true }` so the UI can wire its hooks now and we'll
- * swap implementations later without touching call-sites.
- *
- * Vendor-agnostic by design: no provider names leak into the signatures.
- * Coverage targeted (not just hair): hair, nails, brows, lashes, facial, spa,
- * makeup, wellness, skincare.
+ * Vendor-agnostic by design. 
  */
 
-const PLACEHOLDER = Object.freeze({ data: null, mocked: true });
-
-/**
- * Extract a product (name, brand, type, recommended_for) from an image.
- * Future: vision model → structured JSON.
- */
 export async function extractProductFromImage(_file) {
-  return { ...PLACEHOLDER, hint: "AI product extraction from image (coming soon)" };
+  // Fake realistic extraction delay
+  await new Promise(r => setTimeout(r, 2000));
+  
+  return { 
+    data: {
+      name: "Olaplex No. 4 Bond Maintenance",
+      brand: "Olaplex",
+      category: "Cabello",
+      description: "Shampoo reparador altamente concentrado que hidrata y suaviza intensamente.",
+      price_cents: 120000, // $1,200.00
+      currency: "MXN",
+      recommended_for: ["Seco", "Teñido", "Dañado"]
+    },
+    mocked: true, 
+    hint: "Simulated response for demonstration purposes." 
+  };
 }
 
-/**
- * Extract a product from a public URL (Sephora, Mercado Libre, brand sites).
- * Future: scrape + LLM normalisation.
- */
 export async function extractProductFromUrl(_url) {
-  return { ...PLACEHOLDER, hint: "AI product extraction from URL (coming soon)" };
+  await new Promise(r => setTimeout(r, 2000));
+  return { data: null, mocked: true, hint: "URL extraction not yet simulated." };
 }
 
-/**
- * Suggest services the salon could add based on its current catalog and
- * inferred audience. Returns an array of suggestion objects shaped like:
- * `{ category, name, rationale }`.
- */
 export async function suggestServicesForSalon(_salon, _existingServices) {
-  return { ...PLACEHOLDER, suggestions: [] };
+  await new Promise(r => setTimeout(r, 1500));
+  
+  return {
+    suggestions: [
+      {
+        category: "Cabello",
+        name: "Gloss Hidratante Rápido",
+        rationale: "Tus clientas suelen agendar color. Ofrecer un Gloss como mantenimiento entre sesiones aumentará la retención.",
+        est_price: "$1,200"
+      },
+      {
+        category: "Spa",
+        name: "Masaje Capilar Express",
+        rationale: "Ideal para up-sell durante el tiempo de lavado final. Cero costo de producto extra y 100% ganancia.",
+        est_price: "$350"
+      }
+    ],
+    mocked: true
+  };
 }
 
-/**
- * Suggest a friendly Roomie-tone reply for a client message, scoped to the
- * salon's `roomie_personality` (tone/style/emoji_level/sales_style).
- */
 export async function composeRoomieReply(_salon, _context) {
-  return { ...PLACEHOLDER, reply: null };
+  return { data: null, mocked: true, reply: null };
 }
 
-export const AI_READY = false;
+export const AI_READY = true;

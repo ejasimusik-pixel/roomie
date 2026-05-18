@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { AuthProvider } from "./context/AuthContext";
+import { AIProvider } from "./context/AIContext";
 import ErrorBoundary from "./components/ErrorBoundary";
 import "./lib/i18n";
 import "./index.css";
@@ -13,7 +14,9 @@ root.render(
     <ErrorBoundary>
       <BrowserRouter>
         <AuthProvider>
-          <App />
+          <AIProvider>
+            <App />
+          </AIProvider>
         </AuthProvider>
       </BrowserRouter>
     </ErrorBoundary>
@@ -21,7 +24,7 @@ root.render(
 );
 
 // Register service worker for PWA (production only)
-if ("serviceWorker" in navigator && process.env.NODE_ENV === "production") {
+if ("serviceWorker" in navigator && import.meta.env.MODE === "production") {
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register("/service-worker.js")
