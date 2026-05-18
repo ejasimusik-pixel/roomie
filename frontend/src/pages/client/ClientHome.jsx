@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Sparkles, Droplets, Sun, Star } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import GlassCard from "../../components/GlassCard";
+import InstallPWAButton from "../../components/InstallPWAButton";
 
 export default function ClientHome() {
   const { t } = useTranslation();
@@ -101,11 +102,8 @@ export default function ClientHome() {
         </div>
       </section>
 
-      {/* PWA / App Install Soft CTA */}
-      <section className="bg-gradient-to-r from-violet-100/50 to-magenta-50/50 rounded-2xl p-4 text-center border border-white mt-8 mb-6 hover:shadow-soft transition-all">
-         <p className="font-display text-sm font-extrabold text-violet-900 tracking-wide">Mantén tu Glow Roomie cerca ✨</p>
-         <p className="text-xs text-violet-500 font-medium leading-relaxed mt-1">Abre el menú de opciones tu navegador celular y toca "Añadir a inicio" para instalar la aplicación nativa y disfrutar la experiencia completa.</p>
-      </section>
+      {/* PWA / App Install — native prompt or iOS instructions */}
+      <InstallPWAButton variant="card" />
     </div>
   );
 }

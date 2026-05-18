@@ -22,6 +22,7 @@ import Sidebar from "./Sidebar";
 import BottomNav from "./BottomNav";
 import TopBar from "./TopBar";
 import AIStudioConfigurator from "./AIStudioConfigurator";
+import FirstTimeTutorial from "./FirstTimeTutorial";
 import { useAI } from "../context/AIContext";
 
 /**
@@ -93,6 +94,7 @@ export default function AppShell({ role, title }) {
       )}
 
       <AIStudioConfigurator />
+      <FirstTimeTutorial role={role} />
     </div>
   );
 }

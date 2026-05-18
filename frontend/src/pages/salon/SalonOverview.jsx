@@ -17,6 +17,7 @@ import StatCard from "../../components/StatCard";
 import GlassCard from "../../components/GlassCard";
 import EmptyState from "../../components/EmptyState";
 import Skeleton from "../../components/Skeleton";
+import InstallPWAButton from "../../components/InstallPWAButton";
 
 export default function SalonOverview() {
   const { profile, salonId } = useAuth();
@@ -343,6 +344,9 @@ export default function SalonOverview() {
           </p>
         </div>
       </section>
+
+      {/* PWA install CTA */}
+      <InstallPWAButton variant="card" />
     </div>
   );
 }

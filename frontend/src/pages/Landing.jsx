@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import Logo from "../components/Logo";
 import GlassCard from "../components/GlassCard";
+import InstallPWAButton from "../components/InstallPWAButton";
 import { useAuth } from "../context/AuthContext";
 
 export default function Landing() {
@@ -113,6 +114,7 @@ export default function Landing() {
               >
                 {t("landing.ctaSecondary")}
               </Link>
+              <InstallPWAButton variant="ghost" />
             </div>
 
             <div className="mt-10 flex items-center gap-5">

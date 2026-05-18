@@ -4,34 +4,63 @@
  */
 
 // Model Registry (verified active on OpenRouter · 2026)
+// Visual meters (0-3): speed, quality, costLevel
 export const AI_MODELS = {
   FAST: {
     id: "google/gemini-2.5-flash",
     name: "Gemini 2.5 Flash",
+    label: "Rápido",
+    badge: "⚡",
     category: "Rápido ⚡",
-    description: "Ideal para conversaciones rápidas y dinámicas.",
-    costLevel: 1
+    description: "Latencia mínima. Ideal para charlas dinámicas y respuestas inmediatas.",
+    tagline: "El default sereno · pensado para fluir.",
+    speed: 3,
+    quality: 2,
+    costLevel: 1,
+    accent: "from-amber-200 to-yellow-100",
+    iconColor: "text-amber-500",
   },
   PREMIUM: {
     id: "anthropic/claude-sonnet-4.5",
     name: "Claude Sonnet 4.5",
+    label: "Premium",
+    badge: "✨",
     category: "Premium ✨",
-    description: "Equilibrio perfecto entre velocidad y alta calidad emocional.",
-    costLevel: 2
+    description: "El equilibrio luxury: emoción, criterio y velocidad respetuosa.",
+    tagline: "El concierge sofisticado · para conversaciones con alma.",
+    speed: 2,
+    quality: 3,
+    costLevel: 2,
+    accent: "from-pink-200 to-magenta-100",
+    iconColor: "text-magenta-500",
   },
   CREATIVE: {
     id: "anthropic/claude-opus-4",
     name: "Claude Opus 4",
+    label: "Creativo",
+    badge: "🎨",
     category: "Creativo 🎨",
-    description: "Máxima inteligencia. Ideal para copywriting y estrategias de salón.",
-    costLevel: 3
+    description: "Máxima inteligencia. Copywriting, naming y estrategia premium.",
+    tagline: "El cerebro estratégico · cuando todo importa.",
+    speed: 1,
+    quality: 3,
+    costLevel: 3,
+    accent: "from-violet-200 to-violet-100",
+    iconColor: "text-violet-500",
   },
   ECONOMIC: {
     id: "meta-llama/llama-3.3-70b-instruct:free",
-    name: "Llama 3.3 70B (Free)",
+    name: "Llama 3.3 70B",
+    label: "Económico",
+    badge: "💸",
     category: "Económico 💸",
-    description: "Testeo rápido sin costo de API.",
-    costLevel: 0
+    description: "Modelo gratuito de alta capacidad. Perfecto para tests y demos.",
+    tagline: "Modo zen · sin costo, sin presión.",
+    speed: 2,
+    quality: 2,
+    costLevel: 0,
+    accent: "from-emerald-200 to-emerald-100",
+    iconColor: "text-emerald-500",
   }
 };
 

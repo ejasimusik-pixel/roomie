@@ -1,7 +1,16 @@
 /**
  * Reusable empty-state block. Used wherever a section has no data yet —
  * keeps the luxury aesthetic instead of showing an awkward blank.
+ *
+ * Optional `tone` prop selects an emotional micro-copy hint (whisper) when
+ * description is not enough. Available tones: "calm", "spark", "invite".
  */
+const TONE_WHISPER = {
+  calm: "Respira. Todo a su tiempo.",
+  spark: "Aquí empieza algo bonito.",
+  invite: "Un toque, y Roomie hace el resto.",
+};
+
 export default function EmptyState({
   icon: Icon,
   title,
@@ -9,8 +18,10 @@ export default function EmptyState({
   cta,
   onAction,
   testId,
+  tone,
   className = "",
 }) {
+  const whisper = tone ? TONE_WHISPER[tone] : null;
   return (
     <div
       className={`rm-glass rounded-3xl p-8 text-center flex flex-col items-center ${className}`}
@@ -22,6 +33,11 @@ export default function EmptyState({
       <h3 className="font-display font-bold text-lg text-violet-900">{title}</h3>
       {description && (
         <p className="mt-1.5 text-violet-500 text-sm max-w-xs">{description}</p>
+      )}
+      {whisper && (
+        <p className="mt-3 text-[10px] uppercase tracking-[0.25em] text-violet-300 font-bold">
+          {whisper}
+        </p>
       )}
       {cta && (
         <button

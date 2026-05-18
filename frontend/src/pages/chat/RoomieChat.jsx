@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useAI } from '../../context/AIContext';
-import { fetchOpenRouterChat } from '../../lib/ai/openrouter';
+import { fetchOpenRouterChat, AI_MODELS } from '../../lib/ai/openrouter';
 import { Send, Loader2, Sparkles, User, Bot, Crown, Camera, X } from 'lucide-react';
 import { toast } from 'sonner';
 import GlassCard from '../../components/GlassCard';
@@ -9,7 +9,7 @@ import { useMemoryLite } from '../../hooks/useMemoryLite';
 
 export default function RoomieChat() {
   const { role, profile } = useAuth();
-  const { activeModel, temperature } = useAI();
+  const { activeModel, temperature, setAiStudioOpen } = useAI();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -17,6 +17,11 @@ export default function RoomieChat() {
   const bottomRef = useRef(null);
   const fileInputRef = useRef(null);
   const { memory } = useMemoryLite(role);
+
+  const activeModelMeta = useMemo(
+    () => Object.values(AI_MODELS).find((m) => m.id === activeModel) || AI_MODELS.FAST,
+    [activeModel]
+  );
 
   const isClient = role === 'client';
   const firstName = profile?.full_name?.split(' ')[0] || 'Roomie';
@@ -212,9 +217,19 @@ El nombre de la jefa del salón es ${firstName}. Datos de su salón: ${JSON.stri
             </button>
           </form>
           <div className="text-center mt-2.5">
-            <p className="text-[10px] text-violet-400/80 font-bold uppercase tracking-widest flex items-center justify-center gap-1">
-               <Sparkles size={10} className="text-magenta-500/70" /> Modelo Activo: {activeModel.split('/').pop()}
-            </p>
+            <button
+              type="button"
+              onClick={() => setAiStudioOpen(true)}
+              className="text-[10px] text-violet-400/80 font-bold uppercase tracking-widest inline-flex items-center justify-center gap-1.5 hover:text-magenta-500 transition-colors group"
+              data-testid="roomie-chat-active-model"
+              title="Cambiar modelo en AI Studio"
+            >
+              <Sparkles size={10} className="text-magenta-500/70 group-hover:text-magenta-500" />
+              <span>Roomie está pensando con</span>
+              <span className="text-violet-600 group-hover:text-magenta-500">
+                {activeModelMeta.name} {activeModelMeta.badge}
+              </span>
+            </button>
           </div>
         </div>
       </GlassCard>

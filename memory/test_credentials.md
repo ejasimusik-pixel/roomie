@@ -1,44 +1,33 @@
-# ROOMIE — Test Credentials
+# Roomie · Test Credentials
 
-> **Estado actual**: Supabase real conectado (`dxfqnwdwqmuyyzpdlgcl.supabase.co`).
+> Para demos públicas. Los usuarios `qa+...@example.com` se crean dinámicamente.
+> Estos seeds son los recomendados para presentación.
 
-## Backend
-- **SUPABASE_URL**: `https://dxfqnwdwqmuyyzpdlgcl.supabase.co`
-- **SUPABASE_ANON_KEY**: `sb_publishable_P7JnJVV1mR1QS_F8I4gifA_X7Isz68K`
-- Configuradas en `/app/frontend/.env`.
+## Live Supabase project
+- URL: `https://dxfqnwdwqmuyyzpdlgcl.supabase.co`
+- Las cuentas se crean vía `/signup` (Auth real). El trigger `handle_new_user` aprovisiona automáticamente la fila en `profiles`.
 
-## Cuentas reales creadas
+## Suggested demo accounts to create live during the presentation
+| Role | Email pattern | Password |
+|---|---|---|
+| Cliente | `cliente.demo@roomie.app` | `Roomie2026!` |
+| Salón owner | `valentina@aurorabeauty.lab` | `Roomie2026!` |
+| Admin (interno) | `admin@roomie.app` | `Roomie2026!` |
 
-| Email | Password | Rol | Salón |
-| ----- | -------- | --- | ----- |
-| `test_salon_pahebpcu@roomie.test` | `Roomie2026!` | `salon_owner` | `aurora-qa-pahebpcu` (id `d7ebff18-f707-42d7-b9d8-8d752b6289f0`) |
+## Demo flag overrides (localStorage)
+| Key | Value | Effect |
+|---|---|---|
+| `roomie.tutorial.seen.client` | `done` / `skipped` | Skip First-Time Tutorial para cliente |
+| `roomie.tutorial.seen.salon_owner` | `done` / `skipped` | Skip First-Time Tutorial para salón |
+| `roomie_ai_model` | model id de OpenRouter | Pre-seleccionar modelo en AI Studio |
+| `roomie.pwa.install.dismissed` | `1` | Ocultar tarjeta de instalación PWA |
 
-> Esta cuenta fue creada durante el testing del flujo de onboarding + logo deferred upload. Tiene logo PNG real en `salon-logos/d7ebff18-.../...png` y se puede usar para validar Discover, PublicSalon y el flujo entero.
+## OpenRouter
+- Key vive solo en `frontend/.env` como `VITE_OPENROUTER_API_KEY` (no se commitea).
+- Modelos activos verificados (HTTP 200 contra `openrouter.ai/api/v1/chat/completions`):
+  - `google/gemini-2.5-flash`
+  - `anthropic/claude-sonnet-4.5`
+  - `anthropic/claude-opus-4`
+  - `meta-llama/llama-3.3-70b-instruct:free`
 
-## Cómo crear cuentas adicionales
-
-1. Migraciones requeridas en Supabase SQL Editor (en orden):
-   - `0001_initial.sql`
-   - `0002_create_my_salon.sql`
-   - `0003_storage_and_catalog.sql`
-   - **`0004_fix_salons_rls.sql`** (CRÍTICA para que Discover funcione con authenticated users)
-
-2. En `/signup` registrar la cuenta deseada y seleccionar rol.
-
-3. (Opcional) Promover a admin desde SQL Editor:
-   ```sql
-   update public.profiles set role = 'admin' where email = 'tu-email@example.com';
-   ```
-
-## Rutas por rol (post-login)
-| Rol | Landing tras login | Permisos |
-| --- | ------------------ | -------- |
-| `client` | `/app` | `/app/*` |
-| `salon_owner` | `/salon` | `/salon/*` + `/app/*` |
-| `admin` | `/admin` | acceso total |
-
-## Rutas públicas (sin login)
-- `/discover/:slug` — perfil público de cualquier salón activo
-
-## Bug crítico activo (pendiente fix manual de SQL)
-Si los usuarios autenticados ven "Reintentar" en `/app/discover` o "No pudimos cargar el salón" en `/discover/:slug` → falta correr `0004_fix_salons_rls.sql` en Supabase SQL Editor.
+_Last update: 2026-05-18_
